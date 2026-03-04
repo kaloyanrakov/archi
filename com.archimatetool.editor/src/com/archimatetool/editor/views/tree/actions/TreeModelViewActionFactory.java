@@ -35,7 +35,7 @@ import com.archimatetool.model.IFolder;
 import com.archimatetool.model.IProfile;
 import com.archimatetool.model.ISketchModel;
 import com.archimatetool.model.util.ArchimateModelUtils;
-
+import com.archimatetool.model.IProperty;
 
 
 /**
@@ -238,6 +238,11 @@ public class TreeModelViewActionFactory {
                 // Create a new Diagram Model, set its name
                 IDiagramModel diagramModel = IArchimateFactory.eINSTANCE.createArchimateDiagramModel();
                 diagramModel.setName(Messages.TreeModelViewActionFactory_1);
+                
+                
+                IProperty c4LevelProperty = IArchimateFactory.eINSTANCE.createProperty();
+                c4LevelProperty.setKey("C4 Level"); //$NON-NLS-1$
+                diagramModel.getProperties().add(c4LevelProperty);
                 
                 // Execute Command
                 Command cmd = new NewDiagramCommand(folder, diagramModel, Messages.TreeModelViewActionFactory_1);

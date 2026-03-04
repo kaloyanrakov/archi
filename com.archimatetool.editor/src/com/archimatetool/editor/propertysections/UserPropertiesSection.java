@@ -142,6 +142,17 @@ public class UserPropertiesSection extends AbstractECorePropertySection {
     // Maximum amount of items to display when getting all unique keys and values for combo boxes
     private static final int MAX_ITEMS_COMBO = 20000;
     
+    private static final String C4_LEVEL_KEY = "C4 Level"; //$NON-NLS-1$
+
+    private static final String[] C4_LEVEL_VALUES = {
+        "",
+        "1 - System Context",
+        "2 - Container",
+        "3 - Component",
+        "4 - Code",
+        "Other"
+    };
+    
     // Display all items
     private static final int MAX_ITEMS_ALL = -1;
     
@@ -731,6 +742,14 @@ public class UserPropertiesSection extends AbstractECorePropertySection {
 
         @Override
         protected CellEditor getCellEditor(Object element) {
+            // For C4 Level: lock to fixed dropdown options only
+            if(element instanceof IProperty p && C4_LEVEL_KEY.equals(p.getKey())) {
+                cellEditor.setItems(C4_LEVEL_VALUES);
+                cellEditor.setEditable(false); // prevents typing a custom value
+                return cellEditor;
+            }
+            // All other keys: free-text combo as before
+            cellEditor.setEditable(true);
             String[] items = isAlive(getFirstSelectedElement()) ? getAllUniquePropertyValuesForKeyForModel(((IProperty)element).getKey(), MAX_ITEMS_COMBO) : new String[0];
             cellEditor.setItems(items);
             return cellEditor;
