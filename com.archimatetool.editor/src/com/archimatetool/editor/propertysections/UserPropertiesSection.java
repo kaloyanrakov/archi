@@ -99,7 +99,7 @@ import com.archimatetool.model.IArchimatePackage;
 import com.archimatetool.model.IProperties;
 import com.archimatetool.model.IProperty;
 import com.archimatetool.model.util.LightweightEContentAdapter;
-
+import com.archimatetool.model.IDiagramModel;
 
 
 /**
@@ -145,9 +145,19 @@ public class UserPropertiesSection extends AbstractECorePropertySection {
     
     private static final Map<String, String[]> RESTRICTED_PROPERTY_VALUES = Map.of(
     	    "Model Level", new String[]{"", "Level 1", "Level 2", "Level 3"}
-    	    // To add a new restricted key in the future, we just add it here
-    	    
     	);
+    
+    private static final Map<String, String> NAME_SUFFIX_TRIGGERS = Map.of(
+    	    "Model Level", "- {value}"
+    	);
+    
+    private String stripSuffix(String name) {
+        for(String template : NAME_SUFFIX_TRIGGERS.values()) {
+            String prefix = template.replace("{value}", ".*");
+            name = name.replaceAll("\\s*" + prefix.replace("-", "\\-"), "").trim();
+        }
+        return name;
+    }
     
     // Display all items
     private static final int MAX_ITEMS_ALL = -1;
@@ -785,6 +795,25 @@ public class UserPropertiesSection extends AbstractECorePropertySection {
                     }
                 }
             }
+            
+            
+            if(element instanceof IProperty p) {
+                String suffixTemplate = NAME_SUFFIX_TRIGGERS.get(p.getKey());
+                if(suffixTemplate != null && getFirstSelectedElement() instanceof IDiagramModel diagram) {
+                    String baseName = stripSuffix(diagram.getName());
+                    String newName = ((String)value).isEmpty()
+                        ? baseName
+                        : baseName + " " + suffixTemplate.replace("{value}", (String)value);
+                    Command renameCmd = new EObjectFeatureCommand(
+                        "Rename Diagram",
+                        diagram,
+                        IArchimatePackage.Literals.NAMEABLE__NAME,
+                        newName
+                    );
+                    compoundCmd.add(renameCmd);  // bundled into same undo step ✅
+                }
+            }
+            
             
             // If multi-selection update the local Property without notifications so we don't refresh the table with fresh contents
             // and avoid problems with tab traversal
