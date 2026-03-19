@@ -152,9 +152,20 @@ public class UserPropertiesSection extends AbstractECorePropertySection {
     	);
     
     private String stripSuffix(String name) {
-        for(String template : NAME_SUFFIX_TRIGGERS.values()) {
-            String prefix = template.replace("{value}", ".*");
-            name = name.replaceAll("\\s*" + prefix.replace("-", "\\-"), "").trim();
+        for(Map.Entry<String, String> entry : NAME_SUFFIX_TRIGGERS.entrySet()) {
+            String[] allowedValues = RESTRICTED_PROPERTY_VALUES.get(entry.getKey());
+            if(allowedValues == null) continue;
+            
+            for(String allowedValue : allowedValues) {
+                if(allowedValue.isEmpty()) continue; 
+                
+                String exactSuffix = " " + entry.getValue().replace("{value}", allowedValue);
+                
+                if(name.endsWith(exactSuffix)) {
+                    name = name.substring(0, name.length() - exactSuffix.length()).trim();
+                    break;
+                }
+            }
         }
         return name;
     }
@@ -238,6 +249,7 @@ public class UserPropertiesSection extends AbstractECorePropertySection {
         }
         
         fTableViewer.setInput(fPropertiesElements);
+        injectMissingProperties();
         
         // Locked
         updateLocked();
@@ -249,6 +261,34 @@ public class UserPropertiesSection extends AbstractECorePropertySection {
         fActionNewProperty.setEnabled(!locked);
         fActionRemoveProperties.setEnabled(!locked && !fTableViewer.getSelection().isEmpty());
         fActionNewMultipleProperties.setEnabled(!locked);
+    }
+    
+    private void injectMissingProperties() {
+        IProperties selected = getFirstSelectedElement();
+        
+        // Only apply to diagram models, not elements/relations
+        if(!(selected instanceof IDiagramModel diagram)) {
+            return;
+        }
+        
+        // Check each restricted key - if missing, add it with blank value
+        CompoundCommand compoundCmd = new CompoundCommand();
+        
+        for(String key : RESTRICTED_PROPERTY_VALUES.keySet()) {
+            boolean alreadyExists = diagram.getProperties().stream()
+                .anyMatch(p -> key.equals(p.getKey()));
+            
+            if(!alreadyExists) {
+                IProperty newProperty = IArchimateFactory.eINSTANCE.createProperty();
+                newProperty.setKey(key);
+                newProperty.setValue("");
+                compoundCmd.add(new NewPropertyCommand(diagram.getProperties(), newProperty, -1));
+            }
+        }
+        
+        if(compoundCmd.canExecute()) {
+            executeCommand(compoundCmd.unwrap());
+        }
     }
 
     @Override
@@ -810,7 +850,7 @@ public class UserPropertiesSection extends AbstractECorePropertySection {
                         IArchimatePackage.Literals.NAMEABLE__NAME,
                         newName
                     );
-                    compoundCmd.add(renameCmd);  // bundled into same undo step ✅
+                    compoundCmd.add(renameCmd);
                 }
             }
             
