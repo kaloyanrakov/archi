@@ -87,7 +87,14 @@ import com.archimatetool.model.IArchimatePackage;
 import com.archimatetool.model.IDiagramModel;
 import com.archimatetool.model.IFolder;
 import com.archimatetool.model.IFolderContainer;
-
+import org.eclipse.gef.commands.CommandStack;
+import org.eclipse.gef.commands.CompoundCommand;
+import com.archimatetool.editor.model.commands.EObjectFeatureCommand;
+import com.archimatetool.editor.views.tree.commands.MoveObjectCommand;
+import com.archimatetool.model.IArchimateElement;
+import com.archimatetool.model.IArchimateFactory;
+import com.archimatetool.model.IProperty;
+import org.eclipse.swt.widgets.MenuItem;
 
 
 /**
@@ -124,7 +131,6 @@ implements ITreeModelView, IUIRequestListener {
     private IViewerAction fActionPaste;
     
     private IViewerAction fActionGenerateView;
-    
     private TreeModelViewerFindReplaceProvider fFindReplaceProvider;
     
     private TreeSelectionSynchroniser fSynchroniser;
@@ -369,6 +375,10 @@ implements ITreeModelView, IUIRequestListener {
         IHandlerService handlerService = getSite().getService(IHandlerService.class);
         handlerService.activateHandler(IWorkbenchCommandConstants.NAVIGATE_COLLAPSE_ALL, new ActionHandler(fActionCollapseSelected));
         handlerService.activateHandler(IWorkbenchCommandConstants.NAVIGATE_EXPAND_ALL, new ActionHandler(fActionExpandSelected));
+    
+     
+        
+    
     }
     
     /**
@@ -416,8 +426,68 @@ implements ITreeModelView, IUIRequestListener {
         
         Menu menu = menuMgr.createContextMenu(getViewer().getControl());
         getViewer().getControl().setMenu(menu);
-        
         getSite().registerContextMenu(menuMgr, getViewer());
+        
+        menu.addListener(SWT.Show, event -> {
+            // Dispose any previously injected batch menu items to avoid duplicates
+            for(MenuItem item : menu.getItems()) {
+                if("Batch Assign Level".equals(item.getText())) {
+                    item.dispose();
+                    break;
+                }
+            }
+
+            IStructuredSelection selection = getViewer().getStructuredSelection();
+            boolean hasElements = selection.toList().stream().anyMatch(o -> o instanceof IArchimateElement);
+
+            if(!hasElements) return;
+
+            // Simply append at the end
+            new MenuItem(menu, SWT.SEPARATOR, menu.getItemCount());
+
+            MenuItem batchItem = new MenuItem(menu, SWT.CASCADE, menu.getItemCount());
+            batchItem.setText("Batch Assign Level");
+
+            Menu batchMenu = new Menu(menu);
+            batchItem.setMenu(batchMenu);
+
+            for(String level : new String[]{"Level 1", "Level 2", "Level 3"}) {
+                MenuItem levelItem = new MenuItem(batchMenu, SWT.PUSH);
+                levelItem.setText(level);
+                levelItem.addListener(SWT.Selection, e -> {
+                    CompoundCommand compoundCmd = new CompoundCommand();
+
+                    for(Object obj : selection.toList()) {
+                        if(!(obj instanceof IArchimateElement element)) continue;
+
+                        IArchimateModel model = element.getArchimateModel();
+                        if(model == null) continue;
+
+                        for(IProperty p : element.getProperties()) {
+                            if("Model Level".equals(p.getKey())) {
+                                compoundCmd.add(new EObjectFeatureCommand(
+                                    "Set Model Level", p,
+                                    IArchimatePackage.Literals.PROPERTY__VALUE,
+                                    level
+                                ));
+                                break;
+                            }
+                        }
+
+                        IFolder targetFolder = getOrCreateLevelFolder(model, level);
+                        IFolder currentFolder = (IFolder)element.eContainer();
+                        if(targetFolder != null && !targetFolder.equals(currentFolder)) {
+                            compoundCmd.add(new MoveObjectCommand(targetFolder, element));
+                        }
+                    }
+
+                    if(compoundCmd.canExecute()) {
+                        CommandStack stack = (CommandStack)getActiveArchimateModel().getAdapter(CommandStack.class);
+                        stack.execute(compoundCmd.unwrap());
+                    }
+                });
+            }
+        });
     }
     
     /**
@@ -499,6 +569,10 @@ implements ITreeModelView, IUIRequestListener {
             manager.add(new Separator("end_extensions")); //$NON-NLS-1$
             
             manager.add(new Separator("start_properties")); //$NON-NLS-1$
+            
+           
+
+            
             manager.add(fActionProperties);
             manager.add(new GroupMarker("append_properties")); //$NON-NLS-1$
             manager.add(new Separator("end_properties")); //$NON-NLS-1$
@@ -634,6 +708,22 @@ implements ITreeModelView, IUIRequestListener {
                 getViewer().setFilters(filters);
             }
         });
+    }
+    
+    private IFolder getOrCreateLevelFolder(IArchimateModel model, String levelValue) {
+        IFolder strategyFolder = model.getFolder(FolderType.STRATEGY);
+        if(strategyFolder == null) return null;
+
+        for(IFolder sub : strategyFolder.getFolders()) {
+            if(levelValue.equals(sub.getName())) {
+                return sub;
+            }
+        }
+
+        IFolder newFolder = IArchimateFactory.eINSTANCE.createFolder();
+        newFolder.setName(levelValue);
+        strategyFolder.getFolders().add(newFolder);
+        return newFolder;
     }
     
     /**

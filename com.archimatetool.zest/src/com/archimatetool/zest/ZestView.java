@@ -88,6 +88,9 @@ implements IZestView, ISelectionListener {
     private IAction fActionSelectInModelTree;
     
     private IAction[] fDepthActions;
+    
+    private List<IAction> fLevelFilterActions;
+    
     private IAction[] fDirectionActions;
     private List<IAction> fViewpointActions;
     
@@ -302,7 +305,7 @@ implements IZestView, ISelectionListener {
 
         // Direction
         menuManager.add(createDirectionMenu());
-
+        menuManager.add(createLevelMenu());
 		menuManager.add(new Separator());
 		
 		menuManager.add(fActionSelectInModelTree);
@@ -348,6 +351,8 @@ implements IZestView, ISelectionListener {
         
         // Direction
         createDirectionActions();
+        
+        createLevelFilterActions();
 
         fActionProperties = new PropertiesAction(getViewer());
 
@@ -411,6 +416,38 @@ implements IZestView, ISelectionListener {
         int depth = ArchiZestPlugin.getInstance().getPreferenceStore().getInt(IPreferenceConstants.VISUALISER_DEPTH);
         getContentProvider().setDepth(depth);
         fDepthActions[depth].setChecked(true);
+    }
+    
+    
+    private void createLevelFilterActions() {
+        fLevelFilterActions = new ArrayList<IAction>();
+
+        // "All" option
+        IAction allAction = new Action("All", IAction.AS_RADIO_BUTTON) {
+            @Override
+            public void run() {
+                getContentProvider().setLevelFilter(null);
+                fGraphViewer.setInput(fGraphViewer.getInput());
+                fGraphViewer.setSelection((IStructuredSelection)fGraphViewer.getSelection());
+                fGraphViewer.doApplyLayout();
+            }
+        };
+        allAction.setChecked(true);
+        fLevelFilterActions.add(allAction);
+
+        // Level 1, 2, 3
+        for(String level : new String[]{"Level 1", "Level 2", "Level 3"}) {
+            IAction act = new Action(level, IAction.AS_RADIO_BUTTON) {
+                @Override
+                public void run() {
+                    getContentProvider().setLevelFilter(getText());
+                    fGraphViewer.setInput(fGraphViewer.getInput());
+                    fGraphViewer.setSelection((IStructuredSelection)fGraphViewer.getSelection());
+                    fGraphViewer.doApplyLayout();
+                }
+            };
+            fLevelFilterActions.add(act);
+        }
     }
 
     private IAction createDepthAction(final int actionId, final int depth) {
@@ -745,6 +782,15 @@ implements IZestView, ISelectionListener {
 
         getSite().registerContextMenu(menuMgr, getViewer());
     }
+    
+    private IMenuManager createLevelMenu() {
+        IMenuManager levelMenuManager = new MenuManager("Level Filter");
+        for(IAction action : fLevelFilterActions) {
+            levelMenuManager.add(action);
+        }
+        return levelMenuManager;
+    }
+    
 
     /**
      * Fill context menu when user right-clicks
@@ -775,7 +821,7 @@ implements IZestView, ISelectionListener {
         
         // Direction
         manager.add(createDirectionMenu());
-
+        manager.add(createLevelMenu());
         manager.add(new Separator());
 
         manager.add(fActionCopyImageToClipboard);

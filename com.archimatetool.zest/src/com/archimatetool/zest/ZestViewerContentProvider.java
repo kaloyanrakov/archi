@@ -37,6 +37,7 @@ public class ZestViewerContentProvider implements IGraphContentProvider {
     private Set<EClass> fElementClasses = new LinkedHashSet<>();
     private Set<EClass> fRelationshipClasses = new LinkedHashSet<>();
     private int fDirection = DIR_BOTH;
+    private String fLevelFilter = null;
     
     public void setViewpointFilter(IViewpoint vp) {
         assert(vp != null);
@@ -93,6 +94,14 @@ public class ZestViewerContentProvider implements IGraphContentProvider {
     
     public int getDirection() {
         return fDirection;
+    }
+    
+    public void setLevelFilter(String level) {
+        fLevelFilter = level;
+    }
+
+    public String getLevelFilter() {
+        return fLevelFilter;
     }
 
     public void setDepth(int depth) {
@@ -191,11 +200,21 @@ public class ZestViewerContentProvider implements IGraphContentProvider {
     }
     
     private boolean isVisible(IArchimateElement element) {
-        if(fElementClasses.isEmpty()) {
-            return true;
+        // Element type filter
+        if(!fElementClasses.isEmpty() && !fElementClasses.contains(element.eClass())) {
+            return false;
         }
         
-        return fElementClasses.contains(element.eClass());
+        // Level filter
+        if(fLevelFilter != null) {
+            boolean hasMatchingLevel = element.getProperties().stream()
+                .anyMatch(p -> "Model Level".equals(p.getKey()) && fLevelFilter.equals(p.getValue()));
+            if(!hasMatchingLevel) {
+                return false;
+            }
+        }
+        
+        return true;
     }
 
 	private boolean isVisible(IArchimateRelationship relation) {

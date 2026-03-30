@@ -96,6 +96,7 @@ implements IContainerFigure {
     protected void paintFigure(Graphics graphics) {
         graphics.setAntialias(SWT.ON);
         drawFigure(graphics);
+        LevelBadge.draw(this, graphics);
         if(showTargetFeedback) {
             drawTargetFeedback(graphics);
         }

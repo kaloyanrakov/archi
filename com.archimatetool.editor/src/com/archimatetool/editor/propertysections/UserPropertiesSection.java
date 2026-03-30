@@ -100,7 +100,11 @@ import com.archimatetool.model.IProperties;
 import com.archimatetool.model.IProperty;
 import com.archimatetool.model.util.LightweightEContentAdapter;
 import com.archimatetool.model.IDiagramModel;
-
+import com.archimatetool.model.IDiagramModelArchimateObject;
+import com.archimatetool.model.FolderType;
+import com.archimatetool.model.IArchimateElement;
+import com.archimatetool.model.IFolder;
+import com.archimatetool.editor.views.tree.commands.MoveObjectCommand;
 
 /**
  * User Properties Section
@@ -149,6 +153,10 @@ public class UserPropertiesSection extends AbstractECorePropertySection {
     
     private static final Map<String, String> NAME_SUFFIX_TRIGGERS = Map.of(
     	    "Model Level", "- {value}"
+    	);
+    
+    private static final Map<String, String> FOLDER_TRIGGERS = Map.of(
+    	    "Model Level", "Model Level"
     	);
     
     private String stripSuffix(String name) {
@@ -264,28 +272,48 @@ public class UserPropertiesSection extends AbstractECorePropertySection {
     }
     
     private void injectMissingProperties() {
-        IProperties selected = getFirstSelectedElement();
+        if(getEObjects() == null || getEObjects().isEmpty()) {
+            return;
+        }
+
+        IArchimateModelObject first = getEObjects().get(0);
         
-        // Only apply to diagram models, not elements/relations
-        if(!(selected instanceof IDiagramModel diagram)) {
+        // Skip the model root
+        if(first instanceof IArchimateModel) {
             return;
         }
         
-        // Check each restricted key - if missing, add it with blank value
-        CompoundCommand compoundCmd = new CompoundCommand();
+        // If selected object is a diagram object wrapping an element,
+        // get the underlying concept instead (that's what holds the properties)
+        IProperties target = null;
         
+        if(first instanceof IDiagramModelArchimateObject dmao) {
+            // ✅ Element selected on canvas - use the underlying concept
+            target = dmao.getArchimateElement();
+        }
+        else if(first instanceof IProperties p) {
+            // ✅ Direct selection (diagram, model tree element, etc.)
+            target = p;
+        }
+        
+        if(target == null) {
+            return;
+        }
+
+        CompoundCommand compoundCmd = new CompoundCommand();
+
         for(String key : RESTRICTED_PROPERTY_VALUES.keySet()) {
-            boolean alreadyExists = diagram.getProperties().stream()
+            boolean alreadyExists = target.getProperties().stream()
                 .anyMatch(p -> key.equals(p.getKey()));
-            
+
             if(!alreadyExists) {
                 IProperty newProperty = IArchimateFactory.eINSTANCE.createProperty();
                 newProperty.setKey(key);
                 newProperty.setValue("");
-                compoundCmd.add(new NewPropertyCommand(diagram.getProperties(), newProperty, -1));
+                compoundCmd.add(new NewPropertyCommand(target.getProperties(), newProperty, -1));
             }
         }
-        
+
         if(compoundCmd.canExecute()) {
             executeCommand(compoundCmd.unwrap());
         }
@@ -452,6 +480,68 @@ public class UserPropertiesSection extends AbstractECorePropertySection {
             manager.add(fActionRemoveProperties);
             manager.add(new Separator());
             manager.add(fActionShowKeyEditor);
+
+            // Assign Level submenu — only shown when a "Model Level" property row is selected
+            // OR when elements with a Model Level property are in the current selection
+            boolean hasModelLevelProperty = fPropertiesElements.stream()
+                .anyMatch(el -> el.getProperties().stream()
+                    .anyMatch(p -> "Model Level".equals(p.getKey())));
+
+            if(hasModelLevelProperty) {
+                manager.add(new Separator());
+                MenuManager levelMenu = new MenuManager("Assign Level");
+                for(String level : new String[]{"Level 1", "Level 2", "Level 3"}) {
+                    levelMenu.add(new Action(level) {
+                        @Override
+                        public void run() {
+                            CompoundCommand compoundCmd = new CompoundCommand();
+                            for(IProperties el : fPropertiesElements) {
+                                if(!(el instanceof IArchimateElement element)) continue;
+                                IArchimateModel model = element.getArchimateModel();
+                                if(model == null) continue;
+
+                                // Update the "Model Level" property value
+                                for(IProperty p : element.getProperties()) {
+                                    if("Model Level".equals(p.getKey())) {
+                                        compoundCmd.add(new EObjectFeatureCommand(
+                                            "Set Model Level", p,
+                                            IArchimatePackage.Literals.PROPERTY__VALUE,
+                                            level
+                                        ));
+                                        break;
+                                    }
+                                }
+
+                                // Move to the correct level subfolder
+                                IFolder strategyFolder = model.getFolder(FolderType.STRATEGY);
+                                if(strategyFolder == null) continue;
+
+                                IFolder targetFolder = null;
+                                for(IFolder sub : strategyFolder.getFolders()) {
+                                    if(level.equals(sub.getName())) {
+                                        targetFolder = sub;
+                                        break;
+                                    }
+                                }
+                                if(targetFolder == null) {
+                                    targetFolder = IArchimateFactory.eINSTANCE.createFolder();
+                                    targetFolder.setName(level);
+                                    strategyFolder.getFolders().add(targetFolder);
+                                }
+
+                                IFolder currentFolder = (IFolder)element.eContainer();
+                                if(!targetFolder.equals(currentFolder)) {
+                                    compoundCmd.add(new MoveObjectCommand(targetFolder, element));
+                                }
+                            }
+                            if(compoundCmd.canExecute()) {
+                                executeCommand(compoundCmd.unwrap());
+                            }
+                        }
+                    });
+                }
+                manager.add(levelMenu);
+            }
         });
 
         Menu menu = menuMgr.createContextMenu(fTableViewer.getControl());
@@ -563,6 +653,25 @@ public class UserPropertiesSection extends AbstractECorePropertySection {
             return ((IArchimateModelObject)getFirstSelectedElement()).getArchimateModel();
         }
         return null;
+    }
+    
+    
+    private IFolder getOrCreateLevelFolder(IArchimateModel model, String levelValue) {
+        IFolder strategyFolder = model.getFolder(FolderType.STRATEGY);
+        if(strategyFolder == null) return null;
+
+        // Look for existing subfolder with this name
+        for(IFolder sub : strategyFolder.getFolders()) {
+            if(levelValue.equals(sub.getName())) {
+                return sub;
+            }
+        }
+
+        // Doesn't exist yet - create it silently (no undo-able command, it's infrastructure)
+        IFolder newFolder = IArchimateFactory.eINSTANCE.createFolder();
+        newFolder.setName(levelValue);
+        strategyFolder.getFolders().add(newFolder);
+        return newFolder;
     }
     
     /**
@@ -753,6 +862,7 @@ public class UserPropertiesSection extends AbstractECorePropertySection {
                 }
             }
             
+            
             // If multi-selection update the local Property without notifications so we don't refresh the table with fresh contents
             // and avoid problems with tab traversal
             if(isMultiSelection()) {
@@ -851,6 +961,41 @@ public class UserPropertiesSection extends AbstractECorePropertySection {
                         newName
                     );
                     compoundCmd.add(renameCmd);
+                }
+            }
+            
+            
+       
+            if(element instanceof IProperty p && !((String)value).isEmpty()) {
+                String folderTrigger = FOLDER_TRIGGERS.get(p.getKey());
+                if(folderTrigger != null) {
+                    for(IProperties propertiesElement : fPropertiesElements) {
+                        if(!(propertiesElement instanceof IArchimateElement el)) continue;
+                        IArchimateModel model = el.getArchimateModel();
+                        if(model == null) continue;
+                        IFolder targetFolder = getOrCreateLevelFolder(model, (String)value);
+                        IFolder currentFolder = (IFolder)el.eContainer();
+                        if(targetFolder != null && !targetFolder.equals(currentFolder)) {
+                            compoundCmd.add(new MoveObjectCommand(targetFolder, el));
+                        }
+                    }
+                }
+            }
+
+            
+            if(element instanceof IProperty p && ((String)value).isEmpty()) {
+                String folderTrigger = FOLDER_TRIGGERS.get(p.getKey());
+                if(folderTrigger != null) {
+                    for(IProperties propertiesElement : fPropertiesElements) {
+                        if(!(propertiesElement instanceof IArchimateElement el)) continue;
+                        IArchimateModel model = el.getArchimateModel();
+                        if(model == null) continue;
+                        IFolder strategyFolder = model.getFolder(FolderType.STRATEGY);
+                        IFolder currentFolder = (IFolder)el.eContainer();
+                        if(strategyFolder != null && !strategyFolder.equals(currentFolder)) {
+                            compoundCmd.add(new MoveObjectCommand(strategyFolder, el));
+                        }
+                    }
                 }
             }
             
