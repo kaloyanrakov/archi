@@ -283,16 +283,12 @@ public class UserPropertiesSection extends AbstractECorePropertySection {
             return;
         }
         
-        // If selected object is a diagram object wrapping an element,
-        // get the underlying concept instead (that's what holds the properties)
         IProperties target = null;
         
         if(first instanceof IDiagramModelArchimateObject dmao) {
-            // ✅ Element selected on canvas - use the underlying concept
             target = dmao.getArchimateElement();
         }
         else if(first instanceof IProperties p) {
-            // ✅ Direct selection (diagram, model tree element, etc.)
             target = p;
         }
         
@@ -300,22 +296,29 @@ public class UserPropertiesSection extends AbstractECorePropertySection {
             return;
         }
 
-        CompoundCommand compoundCmd = new CompoundCommand();
+        boolean added = false;
 
-        for(String key : RESTRICTED_PROPERTY_VALUES.keySet()) {
-            boolean alreadyExists = target.getProperties().stream()
-                .anyMatch(p -> key.equals(p.getKey()));
+        ((org.eclipse.emf.ecore.EObject)target).eSetDeliver(false);
+        try {
+            for(String key : RESTRICTED_PROPERTY_VALUES.keySet()) {
+                boolean alreadyExists = target.getProperties().stream()
+                    .anyMatch(p -> key.equals(p.getKey()));
 
-            if(!alreadyExists) {
-                IProperty newProperty = IArchimateFactory.eINSTANCE.createProperty();
-                newProperty.setKey(key);
-                newProperty.setValue("");
-                compoundCmd.add(new NewPropertyCommand(target.getProperties(), newProperty, -1));
+                if(!alreadyExists) {
+                    IProperty newProperty = IArchimateFactory.eINSTANCE.createProperty();
+                    newProperty.setKey(key);
+                    newProperty.setValue("");
+                    target.getProperties().add(newProperty);
+                    added = true;
+                }
             }
         }
+        finally {
+            ((org.eclipse.emf.ecore.EObject)target).eSetDeliver(true);
+        }
 
-        if(compoundCmd.canExecute()) {
-            executeCommand(compoundCmd.unwrap());
+        if(added) {
+            fTableViewer.refresh();
         }
     }
 
@@ -513,21 +516,8 @@ public class UserPropertiesSection extends AbstractECorePropertySection {
                                 }
 
                                 // Move to the correct level subfolder
-                                IFolder strategyFolder = model.getFolder(FolderType.STRATEGY);
-                                if(strategyFolder == null) continue;
-
-                                IFolder targetFolder = null;
-                                for(IFolder sub : strategyFolder.getFolders()) {
-                                    if(level.equals(sub.getName())) {
-                                        targetFolder = sub;
-                                        break;
-                                    }
-                                }
-                                if(targetFolder == null) {
-                                    targetFolder = IArchimateFactory.eINSTANCE.createFolder();
-                                    targetFolder.setName(level);
-                                    strategyFolder.getFolders().add(targetFolder);
-                                }
+                                IFolder targetFolder = getOrCreateLevelFolder(model, element, level);
+                                if(targetFolder == null) continue;
 
                                 IFolder currentFolder = (IFolder)element.eContainer();
                                 if(!targetFolder.equals(currentFolder)) {
@@ -656,21 +646,21 @@ public class UserPropertiesSection extends AbstractECorePropertySection {
     }
     
     
-    private IFolder getOrCreateLevelFolder(IArchimateModel model, String levelValue) {
-        IFolder strategyFolder = model.getFolder(FolderType.STRATEGY);
-        if(strategyFolder == null) return null;
+    private IFolder getOrCreateLevelFolder(IArchimateModel model, IArchimateElement element, String levelValue) {
+        // Use the element's natural default folder (Strategy, Business, Motivation, etc.)
+        IFolder rootFolder = model.getDefaultFolderForObject(element);
+        if(rootFolder == null) return null;
 
         // Look for existing subfolder with this name
-        for(IFolder sub : strategyFolder.getFolders()) {
+        for(IFolder sub : rootFolder.getFolders()) {
             if(levelValue.equals(sub.getName())) {
                 return sub;
             }
         }
 
-        // Doesn't exist yet - create it silently (no undo-able command, it's infrastructure)
         IFolder newFolder = IArchimateFactory.eINSTANCE.createFolder();
         newFolder.setName(levelValue);
-        strategyFolder.getFolders().add(newFolder);
+        rootFolder.getFolders().add(newFolder);
         return newFolder;
     }
     
@@ -966,34 +956,26 @@ public class UserPropertiesSection extends AbstractECorePropertySection {
             
             
        
-            if(element instanceof IProperty p && !((String)value).isEmpty()) {
+            if(element instanceof IProperty p) {
                 String folderTrigger = FOLDER_TRIGGERS.get(p.getKey());
                 if(folderTrigger != null) {
                     for(IProperties propertiesElement : fPropertiesElements) {
                         if(!(propertiesElement instanceof IArchimateElement el)) continue;
                         IArchimateModel model = el.getArchimateModel();
                         if(model == null) continue;
-                        IFolder targetFolder = getOrCreateLevelFolder(model, (String)value);
                         IFolder currentFolder = (IFolder)el.eContainer();
-                        if(targetFolder != null && !targetFolder.equals(currentFolder)) {
-                            compoundCmd.add(new MoveObjectCommand(targetFolder, el));
-                        }
-                    }
-                }
-            }
 
-            
-            if(element instanceof IProperty p && ((String)value).isEmpty()) {
-                String folderTrigger = FOLDER_TRIGGERS.get(p.getKey());
-                if(folderTrigger != null) {
-                    for(IProperties propertiesElement : fPropertiesElements) {
-                        if(!(propertiesElement instanceof IArchimateElement el)) continue;
-                        IArchimateModel model = el.getArchimateModel();
-                        if(model == null) continue;
-                        IFolder strategyFolder = model.getFolder(FolderType.STRATEGY);
-                        IFolder currentFolder = (IFolder)el.eContainer();
-                        if(strategyFolder != null && !strategyFolder.equals(currentFolder)) {
-                            compoundCmd.add(new MoveObjectCommand(strategyFolder, el));
+                        if(!((String)value).isEmpty()) {
+                            IFolder targetFolder = getOrCreateLevelFolder(model, el, (String)value);
+                            if(targetFolder != null && !targetFolder.equals(currentFolder)) {
+                                compoundCmd.add(new MoveObjectCommand(targetFolder, el));
+                            }
+                        }
+                        else {
+                            IFolder rootFolder = model.getDefaultFolderForObject(el);
+                            if(rootFolder != null && !rootFolder.equals(currentFolder)) {
+                                compoundCmd.add(new MoveObjectCommand(rootFolder, el));
+                            }
                         }
                     }
                 }

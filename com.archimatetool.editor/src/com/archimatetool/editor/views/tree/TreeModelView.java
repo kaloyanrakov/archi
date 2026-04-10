@@ -428,66 +428,6 @@ implements ITreeModelView, IUIRequestListener {
         getViewer().getControl().setMenu(menu);
         getSite().registerContextMenu(menuMgr, getViewer());
         
-        menu.addListener(SWT.Show, event -> {
-            // Dispose any previously injected batch menu items to avoid duplicates
-            for(MenuItem item : menu.getItems()) {
-                if("Batch Assign Level".equals(item.getText())) {
-                    item.dispose();
-                    break;
-                }
-            }
-
-            IStructuredSelection selection = getViewer().getStructuredSelection();
-            boolean hasElements = selection.toList().stream().anyMatch(o -> o instanceof IArchimateElement);
-
-            if(!hasElements) return;
-
-            // Simply append at the end
-            new MenuItem(menu, SWT.SEPARATOR, menu.getItemCount());
-
-            MenuItem batchItem = new MenuItem(menu, SWT.CASCADE, menu.getItemCount());
-            batchItem.setText("Batch Assign Level");
-
-            Menu batchMenu = new Menu(menu);
-            batchItem.setMenu(batchMenu);
-
-            for(String level : new String[]{"Level 1", "Level 2", "Level 3"}) {
-                MenuItem levelItem = new MenuItem(batchMenu, SWT.PUSH);
-                levelItem.setText(level);
-                levelItem.addListener(SWT.Selection, e -> {
-                    CompoundCommand compoundCmd = new CompoundCommand();
-
-                    for(Object obj : selection.toList()) {
-                        if(!(obj instanceof IArchimateElement element)) continue;
-
-                        IArchimateModel model = element.getArchimateModel();
-                        if(model == null) continue;
-
-                        for(IProperty p : element.getProperties()) {
-                            if("Model Level".equals(p.getKey())) {
-                                compoundCmd.add(new EObjectFeatureCommand(
-                                    "Set Model Level", p,
-                                    IArchimatePackage.Literals.PROPERTY__VALUE,
-                                    level
-                                ));
-                                break;
-                            }
-                        }
-
-                        IFolder targetFolder = getOrCreateLevelFolder(model, level);
-                        IFolder currentFolder = (IFolder)element.eContainer();
-                        if(targetFolder != null && !targetFolder.equals(currentFolder)) {
-                            compoundCmd.add(new MoveObjectCommand(targetFolder, element));
-                        }
-                    }
-
-                    if(compoundCmd.canExecute()) {
-                        CommandStack stack = (CommandStack)getActiveArchimateModel().getAdapter(CommandStack.class);
-                        stack.execute(compoundCmd.unwrap());
-                    }
-                });
-            }
-        });
     }
     
     /**
@@ -571,7 +511,43 @@ implements ITreeModelView, IUIRequestListener {
             manager.add(new Separator("start_properties")); //$NON-NLS-1$
             
            
-
+            boolean hasElements = selection.toList().stream().anyMatch(o -> o instanceof IArchimateElement);
+            if(hasElements) {
+                MenuManager levelMenu = new MenuManager("Batch Assign Level");
+                for(String level : new String[]{"Level 1", "Level 2", "Level 3"}) {
+                    levelMenu.add(new Action(level) {
+                        @Override
+                        public void run() {
+                            CompoundCommand compoundCmd = new CompoundCommand();
+                            for(Object obj : selection.toList()) {
+                                if(!(obj instanceof IArchimateElement element)) continue;
+                                IArchimateModel model = element.getArchimateModel();
+                                if(model == null) continue;
+                                for(IProperty p : element.getProperties()) {
+                                    if("Model Level".equals(p.getKey())) {
+                                        compoundCmd.add(new EObjectFeatureCommand(
+                                            "Set Model Level", p,
+                                            IArchimatePackage.Literals.PROPERTY__VALUE,
+                                            level
+                                        ));
+                                        break;
+                                    }
+                                }
+                                IFolder targetFolder = getOrCreateLevelFolder(model, element, level);
+                                IFolder currentFolder = (IFolder)element.eContainer();
+                                if(targetFolder != null && !targetFolder.equals(currentFolder)) {
+                                    compoundCmd.add(new MoveObjectCommand(targetFolder, element));
+                                }
+                            }
+                            if(compoundCmd.canExecute()) {
+                                CommandStack stack = (CommandStack)getActiveArchimateModel().getAdapter(CommandStack.class);
+                                stack.execute(compoundCmd.unwrap());
+                            }
+                        }
+                    });
+                }
+                manager.add(levelMenu);
+            }
             
             manager.add(fActionProperties);
             manager.add(new GroupMarker("append_properties")); //$NON-NLS-1$
@@ -710,11 +686,11 @@ implements ITreeModelView, IUIRequestListener {
         });
     }
     
-    private IFolder getOrCreateLevelFolder(IArchimateModel model, String levelValue) {
-        IFolder strategyFolder = model.getFolder(FolderType.STRATEGY);
-        if(strategyFolder == null) return null;
+    private IFolder getOrCreateLevelFolder(IArchimateModel model, IArchimateElement element, String levelValue) {
+        IFolder rootFolder = model.getDefaultFolderForObject(element);
+        if(rootFolder == null) return null;
 
-        for(IFolder sub : strategyFolder.getFolders()) {
+        for(IFolder sub : rootFolder.getFolders()) {
             if(levelValue.equals(sub.getName())) {
                 return sub;
             }
@@ -722,7 +698,7 @@ implements ITreeModelView, IUIRequestListener {
 
         IFolder newFolder = IArchimateFactory.eINSTANCE.createFolder();
         newFolder.setName(levelValue);
-        strategyFolder.getFolders().add(newFolder);
+        rootFolder.getFolders().add(newFolder);
         return newFolder;
     }
     
