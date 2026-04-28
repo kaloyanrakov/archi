@@ -95,7 +95,7 @@ import com.archimatetool.editor.views.tree.commands.MoveObjectCommand;
 import com.archimatetool.model.IArchimateElement;
 import com.archimatetool.model.IArchimateFactory;
 import com.archimatetool.model.IProperty;
-
+import com.archimatetool.model.IDiagramModelArchimateObject;
 
 /**
  * Tree Model View
@@ -538,7 +538,38 @@ implements ITreeModelView, IUIRequestListener {
                                 if(targetFolder != null && !targetFolder.equals(currentFolder)) {
                                     compoundCmd.add(new MoveObjectCommand(targetFolder, element));
                                 }
+                                String abbrev = LEVEL_ABBREVIATIONS.get(level);
+                                for(IDiagramModelArchimateObject dmao : element.getReferencingDiagramObjects()) {
+                                    final IDiagramModelArchimateObject finalDmao = dmao;
+                                    final String newExpr = (abbrev != null) ? abbrev + " ${name}" : null;
+                                    compoundCmd.add(new org.eclipse.gef.commands.Command() {
+                                        private String oldExpr;
+                                        @Override
+                                        public void execute() {
+                                            oldExpr = finalDmao.getFeatures().getString(
+                                                com.archimatetool.editor.ui.textrender.TextRenderer.FEATURE_NAME, null);
+                                            if(newExpr != null) {
+                                                finalDmao.getFeatures().putString(
+                                                    com.archimatetool.editor.ui.textrender.TextRenderer.FEATURE_NAME, newExpr);
+                                            } else {
+                                                finalDmao.getFeatures().remove(
+                                                    com.archimatetool.editor.ui.textrender.TextRenderer.FEATURE_NAME);
+                                            }
+                                        }
+                                        @Override
+                                        public void undo() {
+                                            if(oldExpr != null) {
+                                                finalDmao.getFeatures().putString(
+                                                    com.archimatetool.editor.ui.textrender.TextRenderer.FEATURE_NAME, oldExpr);
+                                            } else {
+                                                finalDmao.getFeatures().remove(
+                                                    com.archimatetool.editor.ui.textrender.TextRenderer.FEATURE_NAME);
+                                            }
+                                        }
+                                    });
+                                }
                             }
+                            
                             if(compoundCmd.canExecute()) {
                                 CommandStack stack = (CommandStack)getActiveArchimateModel().getAdapter(CommandStack.class);
                                 stack.execute(compoundCmd.unwrap());

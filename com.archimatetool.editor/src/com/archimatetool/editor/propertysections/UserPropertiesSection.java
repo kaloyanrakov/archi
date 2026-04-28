@@ -523,6 +523,7 @@ public class UserPropertiesSection extends AbstractECorePropertySection {
                                 if(!targetFolder.equals(currentFolder)) {
                                     compoundCmd.add(new MoveObjectCommand(targetFolder, element));
                                 }
+                                setDiagramObjectsLabelExpression(element, level, compoundCmd);
                             }
                             if(compoundCmd.canExecute()) {
                                 executeCommand(compoundCmd.unwrap());
@@ -678,6 +679,51 @@ public class UserPropertiesSection extends AbstractECorePropertySection {
     	    
     	    rootFolder.getFolders().add(newFolder);
     	    return newFolder;
+    	}
+    	
+    	/**
+    	 * Adds commands to set (or clear) the labelExpression on every canvas instance of the element.
+    	 * @param element   The archimate element being levelled
+    	 * @param levelValue The new "Model Level" value, or "" to clear
+    	 * @param compoundCmd The compound command to append to
+    	 */
+    	private void setDiagramObjectsLabelExpression(IArchimateElement element, String levelValue, CompoundCommand compoundCmd) {
+    	    String abbrev = LEVEL_ABBREVIATIONS.get(levelValue); // null when levelValue is ""
+    	    
+    	    for(IDiagramModelArchimateObject dmao : element.getReferencingDiagramObjects()) {
+    	        final IDiagramModelArchimateObject finalDmao = dmao;
+    	        final String newExpr = (abbrev != null) ? abbrev + " ${name}" : null; //$NON-NLS-1$
+    	        
+    	        compoundCmd.add(new org.eclipse.gef.commands.Command() {
+    	            private String oldExpr;
+    	            
+    	            @Override
+    	            public void execute() {
+    	                oldExpr = finalDmao.getFeatures().getString(
+    	                    com.archimatetool.editor.ui.textrender.TextRenderer.FEATURE_NAME, null);
+    	                if(newExpr != null) {
+    	                    finalDmao.getFeatures().putString(
+    	                        com.archimatetool.editor.ui.textrender.TextRenderer.FEATURE_NAME, newExpr);
+    	                }
+    	                else {
+    	                    finalDmao.getFeatures().remove(
+    	                        com.archimatetool.editor.ui.textrender.TextRenderer.FEATURE_NAME);
+    	                }
+    	            }
+    	            
+    	            @Override
+    	            public void undo() {
+    	                if(oldExpr != null) {
+    	                    finalDmao.getFeatures().putString(
+    	                        com.archimatetool.editor.ui.textrender.TextRenderer.FEATURE_NAME, oldExpr);
+    	                }
+    	                else {
+    	                    finalDmao.getFeatures().remove(
+    	                        com.archimatetool.editor.ui.textrender.TextRenderer.FEATURE_NAME);
+    	                }
+    	            }
+    	        });
+    	    }
     	}
     
     /**
@@ -993,6 +1039,7 @@ public class UserPropertiesSection extends AbstractECorePropertySection {
                                 compoundCmd.add(new MoveObjectCommand(rootFolder, el));
                             }
                         }
+                        setDiagramObjectsLabelExpression(el, (String)value, compoundCmd);
                     }
                 }
             }
