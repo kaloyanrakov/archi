@@ -646,23 +646,39 @@ public class UserPropertiesSection extends AbstractECorePropertySection {
     }
     
     
-    private IFolder getOrCreateLevelFolder(IArchimateModel model, IArchimateElement element, String levelValue) {
-        // Use the element's natural default folder (Strategy, Business, Motivation, etc.)
-        IFolder rootFolder = model.getDefaultFolderForObject(element);
-        if(rootFolder == null) return null;
+    private static final Map<String, String> LEVEL_ABBREVIATIONS = Map.of(
+    	    "Level 1", "L1",
+    	    "Level 2", "L2",
+    	    "Level 3", "L3"
+    	);
 
-        // Look for existing subfolder with this name
-        for(IFolder sub : rootFolder.getFolders()) {
-            if(levelValue.equals(sub.getName())) {
-                return sub;
-            }
-        }
+    	private IFolder getOrCreateLevelFolder(IArchimateModel model, IArchimateElement element, String levelValue) {
+    	    // Use the element's natural default folder (Strategy, Business, Motivation, etc.)
+    	    IFolder rootFolder = model.getDefaultFolderForObject(element);
+    	    if(rootFolder == null) return null;
 
-        IFolder newFolder = IArchimateFactory.eINSTANCE.createFolder();
-        newFolder.setName(levelValue);
-        rootFolder.getFolders().add(newFolder);
-        return newFolder;
-    }
+    	    // Look for existing subfolder with this name
+    	    for(IFolder sub : rootFolder.getFolders()) {
+    	        if(levelValue.equals(sub.getName())) {
+    	            return sub;
+    	        }
+    	    }
+
+    	    IFolder newFolder = IArchimateFactory.eINSTANCE.createFolder();
+    	    newFolder.setName(levelValue);
+    	    
+    	    // Set label expression so all elements in this folder display with the abbreviation
+    	    String abbrev = LEVEL_ABBREVIATIONS.get(levelValue);
+    	    if(abbrev != null) {
+    	        newFolder.getFeatures().putString(
+    	            com.archimatetool.editor.ui.textrender.TextRenderer.FEATURE_NAME,
+    	            abbrev + " ${name}"
+    	        );
+    	    }
+    	    
+    	    rootFolder.getFolders().add(newFolder);
+    	    return newFolder;
+    	}
     
     /**
      * @return All unique Property Keys for an entire model (sorted)

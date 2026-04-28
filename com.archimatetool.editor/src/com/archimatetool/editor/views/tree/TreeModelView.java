@@ -11,6 +11,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import org.eclipse.emf.common.notify.Notification;
@@ -94,7 +95,6 @@ import com.archimatetool.editor.views.tree.commands.MoveObjectCommand;
 import com.archimatetool.model.IArchimateElement;
 import com.archimatetool.model.IArchimateFactory;
 import com.archimatetool.model.IProperty;
-import org.eclipse.swt.widgets.MenuItem;
 
 
 /**
@@ -686,21 +686,36 @@ implements ITreeModelView, IUIRequestListener {
         });
     }
     
-    private IFolder getOrCreateLevelFolder(IArchimateModel model, IArchimateElement element, String levelValue) {
-        IFolder rootFolder = model.getDefaultFolderForObject(element);
-        if(rootFolder == null) return null;
+    private static final Map<String, String> LEVEL_ABBREVIATIONS = Map.of(
+    	    "Level 1", "L1",
+    	    "Level 2", "L2",
+    	    "Level 3", "L3"
+    	);
 
-        for(IFolder sub : rootFolder.getFolders()) {
-            if(levelValue.equals(sub.getName())) {
-                return sub;
+    	private IFolder getOrCreateLevelFolder(IArchimateModel model, IArchimateElement element, String levelValue) {
+    	   IFolder rootFolder = model.getDefaultFolderForObject(element);
+    	   if(rootFolder == null) return null;
+
+    	   for(IFolder sub : rootFolder.getFolders()) {
+    	       if(levelValue.equals(sub.getName())) {
+    	           return sub;
             }
-        }
+   	    }
 
-        IFolder newFolder = IArchimateFactory.eINSTANCE.createFolder();
-        newFolder.setName(levelValue);
+   	    IFolder newFolder = IArchimateFactory.eINSTANCE.createFolder();
+   	    newFolder.setName(levelValue);
+   	        	    // Set label expression so all elements in this folder display with the abbreviation
+        String abbrev = LEVEL_ABBREVIATIONS.get(levelValue);
+   	    if(abbrev != null) {
+   	        newFolder.getFeatures().putString(
+   	            com.archimatetool.editor.ui.textrender.TextRenderer.FEATURE_NAME,
+   	            abbrev + " ${name}"
+    	       );
+    	   }
+    	    
         rootFolder.getFolders().add(newFolder);
-        return newFolder;
-    }
+   	    return newFolder;
+   	}
     
     /**
      * @return true if the node containing object, or any of its child nodes, can be expanded
