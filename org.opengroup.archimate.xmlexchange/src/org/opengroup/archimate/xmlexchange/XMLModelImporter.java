@@ -59,8 +59,11 @@ import com.archimatetool.model.IDiagramModelReference;
 import com.archimatetool.model.IFolder;
 import com.archimatetool.model.IFontAttribute;
 import com.archimatetool.model.IInfluenceRelationship;
+import com.archimatetool.model.IProfile;
+import com.archimatetool.model.IProfiles;
 import com.archimatetool.model.IProperties;
 import com.archimatetool.model.IProperty;
+import com.archimatetool.model.util.ArchimateModelUtils;
 
 
 
@@ -174,9 +177,9 @@ public class XMLModelImporter implements IXMLExchangeGlobals {
         addProperties(fModel, rootElement);
     }
     
-    // ========================================= Properties ======================================
+    // ========================================= Properties / Specializations ======================================
 
-    private void addProperties(IProperties propertiesModel, Element parentElement) {
+    private void addProperties(IProperties propertiesObject, Element parentElement) {
         Element propertiesElement = parentElement.getChild(ELEMENT_PROPERTIES, ARCHIMATE3_NAMESPACE);
         
         if(propertiesElement != null) {
@@ -185,12 +188,33 @@ public class XMLModelImporter implements IXMLExchangeGlobals {
                 
                 if(idref != null) {
                     String propertyName = fPropertyDefinitionsList.get(idref);
+                    
                     if(propertyName != null) {
                         String propertyValue = getChildElementText(propertyElement, ELEMENT_VALUE, true);
-                        IProperty property = IArchimateFactory.eINSTANCE.createProperty();
-                        property.setKey(propertyName);
-                        property.setValue(propertyValue);
-                        propertiesModel.getProperties().add(property);
+                        
+                        // Specialization
+                        if(idref.equals("specialization") && propertiesObject instanceof IProfiles profilesObject) { //$NON-NLS-1$
+                            // Do we have this Profile in the model?
+                            IProfile profile = ArchimateModelUtils.getProfileByNameAndType(fModel, propertyValue, profilesObject.eClass().getName());
+                            // No, add Profile to model
+                            if(profile == null) {
+                                profile = IArchimateFactory.eINSTANCE.createProfile();
+                                profile.setConceptType(profilesObject.eClass().getName());
+                                profile.setName(propertyValue);
+                                fModel.getProfiles().add(profile);
+                            }
+                            // Add Profile to concept
+                            if(!profilesObject.getProfiles().contains(profile)) {
+                                profilesObject.getProfiles().add(profile);
+                            }
+                        }
+                        // Property
+                        else {
+                            IProperty property = IArchimateFactory.eINSTANCE.createProperty();
+                            property.setKey(propertyName);
+                            property.setValue(propertyValue);
+                            propertiesObject.getProperties().add(property);
+                        }
                     }
                 }
             }
