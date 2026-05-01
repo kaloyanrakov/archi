@@ -538,10 +538,10 @@ implements ITreeModelView, IUIRequestListener {
                                 if(targetFolder != null && !targetFolder.equals(currentFolder)) {
                                     compoundCmd.add(new MoveObjectCommand(targetFolder, element));
                                 }
-                                String abbrev = LEVEL_ABBREVIATIONS.get(level);
+                                
                                 for(IDiagramModelArchimateObject dmao : element.getReferencingDiagramObjects()) {
                                     final IDiagramModelArchimateObject finalDmao = dmao;
-                                    final String newExpr = (abbrev != null) ? abbrev + " ${name}" : null;
+                                    final String newExpr = "${property:Model Level} ${name}";
                                     compoundCmd.add(new org.eclipse.gef.commands.Command() {
                                         private String oldExpr;
                                         @Override
@@ -717,11 +717,6 @@ implements ITreeModelView, IUIRequestListener {
         });
     }
     
-    private static final Map<String, String> LEVEL_ABBREVIATIONS = Map.of(
-    	    "Level 1", "L1",
-    	    "Level 2", "L2",
-    	    "Level 3", "L3"
-    	);
 
     	private IFolder getOrCreateLevelFolder(IArchimateModel model, IArchimateElement element, String levelValue) {
     	   IFolder rootFolder = model.getDefaultFolderForObject(element);
@@ -736,14 +731,7 @@ implements ITreeModelView, IUIRequestListener {
    	    IFolder newFolder = IArchimateFactory.eINSTANCE.createFolder();
    	    newFolder.setName(levelValue);
    	        	    // Set label expression so all elements in this folder display with the abbreviation
-        String abbrev = LEVEL_ABBREVIATIONS.get(levelValue);
-   	    if(abbrev != null) {
-   	        newFolder.getFeatures().putString(
-   	            com.archimatetool.editor.ui.textrender.TextRenderer.FEATURE_NAME,
-   	            abbrev + " ${name}"
-    	       );
-    	   }
-    	    
+           
         rootFolder.getFolders().add(newFolder);
    	    return newFolder;
    	}
