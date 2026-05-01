@@ -224,6 +224,39 @@ public class UserPropertiesSection extends AbstractECorePropertySection {
         
         // Locked
         updateLocked();
+        injectMissingProperties();
+    }
+    
+    private void injectMissingProperties() {
+        if(fPropertiesElements.isEmpty()) return;
+
+        for(IProperties target : fPropertiesElements) {
+            if(!(target instanceof IArchimateElement)) continue;
+
+            boolean added = false;
+            ((org.eclipse.emf.ecore.EObject)target).eSetDeliver(false);
+            try {
+                for(IPropertyDecorator decorator : PropertyDecoratorRegistry.getAllDecorators()) {
+                    String key = decorator.getPropertyKey();
+                    boolean alreadyExists = target.getProperties().stream()
+                        .anyMatch(p -> key.equals(p.getKey()));
+                    if(!alreadyExists) {
+                        IProperty newProperty = IArchimateFactory.eINSTANCE.createProperty();
+                        newProperty.setKey(key);
+                        newProperty.setValue(""); //$NON-NLS-1$
+                        target.getProperties().add(newProperty);
+                        added = true;
+                    }
+                }
+            }
+            finally {
+                ((org.eclipse.emf.ecore.EObject)target).eSetDeliver(true);
+            }
+
+            if(added) {
+                fTableViewer.refresh();
+            }
+        }
     }
     
     private void updateLocked() {
