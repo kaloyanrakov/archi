@@ -11,7 +11,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 
 import org.eclipse.emf.common.notify.Notification;
@@ -88,14 +87,12 @@ import com.archimatetool.model.IArchimatePackage;
 import com.archimatetool.model.IDiagramModel;
 import com.archimatetool.model.IFolder;
 import com.archimatetool.model.IFolderContainer;
-import org.eclipse.gef.commands.CommandStack;
-import org.eclipse.gef.commands.CompoundCommand;
-import com.archimatetool.editor.model.commands.EObjectFeatureCommand;
-import com.archimatetool.editor.views.tree.commands.MoveObjectCommand;
+import com.archimatetool.editor.propertysections.IPropertyDecorator;
+import com.archimatetool.editor.propertysections.PropertyDecoratorRegistry;
 import com.archimatetool.model.IArchimateElement;
-import com.archimatetool.model.IArchimateFactory;
 import com.archimatetool.model.IProperty;
-import com.archimatetool.model.IDiagramModelArchimateObject;
+import com.archimatetool.editor.model.commands.EObjectFeatureCommand;
+import org.eclipse.gef.commands.CompoundCommand;
 
 /**
  * Tree Model View
@@ -131,6 +128,7 @@ implements ITreeModelView, IUIRequestListener {
     private IViewerAction fActionPaste;
     
     private IViewerAction fActionGenerateView;
+    
     private TreeModelViewerFindReplaceProvider fFindReplaceProvider;
     
     private TreeSelectionSynchroniser fSynchroniser;
@@ -375,10 +373,6 @@ implements ITreeModelView, IUIRequestListener {
         IHandlerService handlerService = getSite().getService(IHandlerService.class);
         handlerService.activateHandler(IWorkbenchCommandConstants.NAVIGATE_COLLAPSE_ALL, new ActionHandler(fActionCollapseSelected));
         handlerService.activateHandler(IWorkbenchCommandConstants.NAVIGATE_EXPAND_ALL, new ActionHandler(fActionExpandSelected));
-    
-     
-        
-    
     }
     
     /**
@@ -426,8 +420,8 @@ implements ITreeModelView, IUIRequestListener {
         
         Menu menu = menuMgr.createContextMenu(getViewer().getControl());
         getViewer().getControl().setMenu(menu);
-        getSite().registerContextMenu(menuMgr, getViewer());
         
+        getSite().registerContextMenu(menuMgr, getViewer());
     }
     
     /**
@@ -502,76 +496,41 @@ implements ITreeModelView, IUIRequestListener {
             }
             
             manager.add(fActionRename);
-
-            manager.add(new Separator("start_extensions")); //$NON-NLS-1$
-            manager.add(fActionGenerateView);
-            manager.add(new GroupMarker("append_extensions")); //$NON-NLS-1$
-            manager.add(new Separator("end_extensions")); //$NON-NLS-1$
             
-            manager.add(new Separator("start_properties")); //$NON-NLS-1$
-            
-           
             boolean hasElements = selection.toList().stream().anyMatch(o -> o instanceof IArchimateElement);
             if(hasElements) {
-                MenuManager levelMenu = new MenuManager("Batch Assign Level");
-                for(String level : new String[]{"Level 1", "Level 2", "Level 3"}) {
+                MenuManager levelMenu = new MenuManager("Batch Assign Level"); //$NON-NLS-1$
+                for(String level : PropertyDecoratorRegistry.getAllDecorators().stream()
+                        .filter(d -> "Model Level".equals(d.getPropertyKey())) //$NON-NLS-1$
+                        .findFirst()
+                        .map(d -> d.getRestrictedValues())
+                        .orElse(new String[0])) {
+                    if(level.isEmpty()) continue;
+                    final String finalLevel = level;
                     levelMenu.add(new Action(level) {
                         @Override
                         public void run() {
                             CompoundCommand compoundCmd = new CompoundCommand();
+                            IPropertyDecorator decorator = PropertyDecoratorRegistry.getDecorator("Model Level"); //$NON-NLS-1$
                             for(Object obj : selection.toList()) {
                                 if(!(obj instanceof IArchimateElement element)) continue;
-                                IArchimateModel model = element.getArchimateModel();
-                                if(model == null) continue;
+                                if(element.getArchimateModel() == null) continue;
                                 for(IProperty p : element.getProperties()) {
-                                    if("Model Level".equals(p.getKey())) {
+                                    if("Model Level".equals(p.getKey())) { //$NON-NLS-1$
                                         compoundCmd.add(new EObjectFeatureCommand(
-                                            "Set Model Level", p,
-                                            IArchimatePackage.Literals.PROPERTY__VALUE,
-                                            level
-                                        ));
+                                            "Set Model Level", p, //$NON-NLS-1$
+                                            IArchimatePackage.Literals.PROPERTY__VALUE, finalLevel));
                                         break;
                                     }
                                 }
-                                IFolder targetFolder = getOrCreateLevelFolder(model, element, level);
-                                IFolder currentFolder = (IFolder)element.eContainer();
-                                if(targetFolder != null && !targetFolder.equals(currentFolder)) {
-                                    compoundCmd.add(new MoveObjectCommand(targetFolder, element));
-                                }
-                                
-                                for(IDiagramModelArchimateObject dmao : element.getReferencingDiagramObjects()) {
-                                    final IDiagramModelArchimateObject finalDmao = dmao;
-                                    final String newExpr = "${property:Model Level} ${name}";
-                                    compoundCmd.add(new org.eclipse.gef.commands.Command() {
-                                        private String oldExpr;
-                                        @Override
-                                        public void execute() {
-                                            oldExpr = finalDmao.getFeatures().getString(
-                                                com.archimatetool.editor.ui.textrender.TextRenderer.FEATURE_NAME, null);
-                                            if(newExpr != null) {
-                                                finalDmao.getFeatures().putString(
-                                                    com.archimatetool.editor.ui.textrender.TextRenderer.FEATURE_NAME, newExpr);
-                                            } else {
-                                                finalDmao.getFeatures().remove(
-                                                    com.archimatetool.editor.ui.textrender.TextRenderer.FEATURE_NAME);
-                                            }
-                                        }
-                                        @Override
-                                        public void undo() {
-                                            if(oldExpr != null) {
-                                                finalDmao.getFeatures().putString(
-                                                    com.archimatetool.editor.ui.textrender.TextRenderer.FEATURE_NAME, oldExpr);
-                                            } else {
-                                                finalDmao.getFeatures().remove(
-                                                    com.archimatetool.editor.ui.textrender.TextRenderer.FEATURE_NAME);
-                                            }
-                                        }
-                                    });
+                                if(decorator != null) {
+                                    decorator.contributeCommands(element, finalLevel, compoundCmd);
                                 }
                             }
-                            
                             if(compoundCmd.canExecute()) {
-                                CommandStack stack = (CommandStack)getActiveArchimateModel().getAdapter(CommandStack.class);
+                                org.eclipse.gef.commands.CommandStack stack = 
+                                    (org.eclipse.gef.commands.CommandStack)getActiveArchimateModel().getAdapter(
+                                        org.eclipse.gef.commands.CommandStack.class);
                                 stack.execute(compoundCmd.unwrap());
                             }
                         }
@@ -579,7 +538,13 @@ implements ITreeModelView, IUIRequestListener {
                 }
                 manager.add(levelMenu);
             }
+
+            manager.add(new Separator("start_extensions")); //$NON-NLS-1$
+            manager.add(fActionGenerateView);
+            manager.add(new GroupMarker("append_extensions")); //$NON-NLS-1$
+            manager.add(new Separator("end_extensions")); //$NON-NLS-1$
             
+            manager.add(new Separator("start_properties")); //$NON-NLS-1$
             manager.add(fActionProperties);
             manager.add(new GroupMarker("append_properties")); //$NON-NLS-1$
             manager.add(new Separator("end_properties")); //$NON-NLS-1$
@@ -716,25 +681,6 @@ implements ITreeModelView, IUIRequestListener {
             }
         });
     }
-    
-
-    	private IFolder getOrCreateLevelFolder(IArchimateModel model, IArchimateElement element, String levelValue) {
-    	   IFolder rootFolder = model.getDefaultFolderForObject(element);
-    	   if(rootFolder == null) return null;
-
-    	   for(IFolder sub : rootFolder.getFolders()) {
-    	       if(levelValue.equals(sub.getName())) {
-    	           return sub;
-            }
-   	    }
-
-   	    IFolder newFolder = IArchimateFactory.eINSTANCE.createFolder();
-   	    newFolder.setName(levelValue);
-   	        	    // Set label expression so all elements in this folder display with the abbreviation
-           
-        rootFolder.getFolders().add(newFolder);
-   	    return newFolder;
-   	}
     
     /**
      * @return true if the node containing object, or any of its child nodes, can be expanded

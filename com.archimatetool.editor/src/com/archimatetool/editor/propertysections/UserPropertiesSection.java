@@ -99,12 +99,8 @@ import com.archimatetool.model.IArchimatePackage;
 import com.archimatetool.model.IProperties;
 import com.archimatetool.model.IProperty;
 import com.archimatetool.model.util.LightweightEContentAdapter;
-import com.archimatetool.model.IDiagramModel;
-import com.archimatetool.model.IDiagramModelArchimateObject;
-import com.archimatetool.model.FolderType;
 import com.archimatetool.model.IArchimateElement;
-import com.archimatetool.model.IFolder;
-import com.archimatetool.editor.views.tree.commands.MoveObjectCommand;
+
 
 /**
  * User Properties Section
@@ -145,38 +141,6 @@ public class UserPropertiesSection extends AbstractECorePropertySection {
     
     // Maximum amount of items to display when getting all unique keys and values for combo boxes
     private static final int MAX_ITEMS_COMBO = 20000;
-    
-    
-    private static final Map<String, String[]> RESTRICTED_PROPERTY_VALUES = Map.of(
-    	    "Model Level", new String[]{"", "L1", "L2", "L3"}
-    	);
-    
-    private static final Map<String, String> NAME_SUFFIX_TRIGGERS = Map.of(
-    	    "Model Level", "- {value}"
-    	);
-    
-    private static final Map<String, String> FOLDER_TRIGGERS = Map.of(
-    	    "Model Level", "Model Level"
-    	);
-    
-    private String stripSuffix(String name) {
-        for(Map.Entry<String, String> entry : NAME_SUFFIX_TRIGGERS.entrySet()) {
-            String[] allowedValues = RESTRICTED_PROPERTY_VALUES.get(entry.getKey());
-            if(allowedValues == null) continue;
-            
-            for(String allowedValue : allowedValues) {
-                if(allowedValue.isEmpty()) continue; 
-                
-                String exactSuffix = " " + entry.getValue().replace("{value}", allowedValue);
-                
-                if(name.endsWith(exactSuffix)) {
-                    name = name.substring(0, name.length() - exactSuffix.length()).trim();
-                    break;
-                }
-            }
-        }
-        return name;
-    }
     
     // Display all items
     private static final int MAX_ITEMS_ALL = -1;
@@ -257,7 +221,6 @@ public class UserPropertiesSection extends AbstractECorePropertySection {
         }
         
         fTableViewer.setInput(fPropertiesElements);
-        injectMissingProperties();
         
         // Locked
         updateLocked();
@@ -269,57 +232,6 @@ public class UserPropertiesSection extends AbstractECorePropertySection {
         fActionNewProperty.setEnabled(!locked);
         fActionRemoveProperties.setEnabled(!locked && !fTableViewer.getSelection().isEmpty());
         fActionNewMultipleProperties.setEnabled(!locked);
-    }
-    
-    private void injectMissingProperties() {
-        if(getEObjects() == null || getEObjects().isEmpty()) {
-            return;
-        }
-
-        IArchimateModelObject first = getEObjects().get(0);
-        
-        // Skip the model root
-        if(first instanceof IArchimateModel) {
-            return;
-        }
-        
-        IProperties target = null;
-        
-        if(first instanceof IDiagramModelArchimateObject dmao) {
-            target = dmao.getArchimateElement();
-        }
-        else if(first instanceof IProperties p) {
-            target = p;
-        }
-        
-        if(target == null) {
-            return;
-        }
-
-        boolean added = false;
-
-        ((org.eclipse.emf.ecore.EObject)target).eSetDeliver(false);
-        try {
-            for(String key : RESTRICTED_PROPERTY_VALUES.keySet()) {
-                boolean alreadyExists = target.getProperties().stream()
-                    .anyMatch(p -> key.equals(p.getKey()));
-
-                if(!alreadyExists) {
-                    IProperty newProperty = IArchimateFactory.eINSTANCE.createProperty();
-                    newProperty.setKey(key);
-                    newProperty.setValue("");
-                    target.getProperties().add(newProperty);
-                    added = true;
-                }
-            }
-        }
-        finally {
-            ((org.eclipse.emf.ecore.EObject)target).eSetDeliver(true);
-        }
-
-        if(added) {
-            fTableViewer.refresh();
-        }
     }
 
     @Override
@@ -483,56 +395,6 @@ public class UserPropertiesSection extends AbstractECorePropertySection {
             manager.add(fActionRemoveProperties);
             manager.add(new Separator());
             manager.add(fActionShowKeyEditor);
-
-            // Assign Level submenu — only shown when a "Model Level" property row is selected
-            // OR when elements with a Model Level property are in the current selection
-            boolean hasModelLevelProperty = fPropertiesElements.stream()
-                .anyMatch(el -> el.getProperties().stream()
-                    .anyMatch(p -> "Model Level".equals(p.getKey())));
-
-            if(hasModelLevelProperty) {
-                manager.add(new Separator());
-                MenuManager levelMenu = new MenuManager("Assign Level");
-                for(String level : new String[]{"L1", "L2", "L3"}) {
-                    levelMenu.add(new Action(level) {
-                        @Override
-                        public void run() {
-                            CompoundCommand compoundCmd = new CompoundCommand();
-                            for(IProperties el : fPropertiesElements) {
-                                if(!(el instanceof IArchimateElement element)) continue;
-                                IArchimateModel model = element.getArchimateModel();
-                                if(model == null) continue;
-
-                                // Update the "Model Level" property value
-                                for(IProperty p : element.getProperties()) {
-                                    if("Model Level".equals(p.getKey())) {
-                                        compoundCmd.add(new EObjectFeatureCommand(
-                                            "Set Model Level", p,
-                                            IArchimatePackage.Literals.PROPERTY__VALUE,
-                                            level
-                                        ));
-                                        break;
-                                    }
-                                }
-
-                                // Move to the correct level subfolder
-                                IFolder targetFolder = getOrCreateLevelFolder(model, element, level);
-                                if(targetFolder == null) continue;
-
-                                IFolder currentFolder = (IFolder)element.eContainer();
-                                if(!targetFolder.equals(currentFolder)) {
-                                    compoundCmd.add(new MoveObjectCommand(targetFolder, element));
-                                }
-                                setDiagramObjectsLabelExpression(element, level, compoundCmd);
-                            }
-                            if(compoundCmd.canExecute()) {
-                                executeCommand(compoundCmd.unwrap());
-                            }
-                        }
-                    });
-                }
-                manager.add(levelMenu);
-            }
         });
 
         Menu menu = menuMgr.createContextMenu(fTableViewer.getControl());
@@ -645,75 +507,6 @@ public class UserPropertiesSection extends AbstractECorePropertySection {
         }
         return null;
     }
-    
-    
-   
-
-    	private IFolder getOrCreateLevelFolder(IArchimateModel model, IArchimateElement element, String levelValue) {
-    	    // Use the element's natural default folder (Strategy, Business, Motivation, etc.)
-    	    IFolder rootFolder = model.getDefaultFolderForObject(element);
-    	    if(rootFolder == null) return null;
-
-    	    // Look for existing subfolder with this name
-    	    for(IFolder sub : rootFolder.getFolders()) {
-    	        if(levelValue.equals(sub.getName())) {
-    	            return sub;
-    	        }
-    	    }
-
-    	    IFolder newFolder = IArchimateFactory.eINSTANCE.createFolder();
-    	    newFolder.setName(levelValue);
-    	    
-    	    
-    	    
-    	    
-    	    rootFolder.getFolders().add(newFolder);
-    	    return newFolder;
-    	}
-    	
-    	/**
-    	 * Adds commands to set (or clear) the labelExpression on every canvas instance of the element.
-    	 * @param element   The archimate element being levelled
-    	 * @param levelValue The new "Model Level" value, or "" to clear
-    	 * @param compoundCmd The compound command to append to
-    	 */
-    	private void setDiagramObjectsLabelExpression(IArchimateElement element, String levelValue, CompoundCommand compoundCmd) {
-    	    
-    	    for(IDiagramModelArchimateObject dmao : element.getReferencingDiagramObjects()) {
-    	        final IDiagramModelArchimateObject finalDmao = dmao;
-    	        final String newExpr = (!levelValue.isEmpty()) ? "${property:Model Level} ${name}" : null;
-    	        
-    	        compoundCmd.add(new org.eclipse.gef.commands.Command() {
-    	            private String oldExpr;
-    	            
-    	            @Override
-    	            public void execute() {
-    	                oldExpr = finalDmao.getFeatures().getString(
-    	                    com.archimatetool.editor.ui.textrender.TextRenderer.FEATURE_NAME, null);
-    	                if(newExpr != null) {
-    	                    finalDmao.getFeatures().putString(
-    	                        com.archimatetool.editor.ui.textrender.TextRenderer.FEATURE_NAME, newExpr);
-    	                }
-    	                else {
-    	                    finalDmao.getFeatures().remove(
-    	                        com.archimatetool.editor.ui.textrender.TextRenderer.FEATURE_NAME);
-    	                }
-    	            }
-    	            
-    	            @Override
-    	            public void undo() {
-    	                if(oldExpr != null) {
-    	                    finalDmao.getFeatures().putString(
-    	                        com.archimatetool.editor.ui.textrender.TextRenderer.FEATURE_NAME, oldExpr);
-    	                }
-    	                else {
-    	                    finalDmao.getFeatures().remove(
-    	                        com.archimatetool.editor.ui.textrender.TextRenderer.FEATURE_NAME);
-    	                }
-    	            }
-    	        });
-    	    }
-    	}
     
     /**
      * @return All unique Property Keys for an entire model (sorted)
@@ -903,7 +696,6 @@ public class UserPropertiesSection extends AbstractECorePropertySection {
                 }
             }
             
-            
             // If multi-selection update the local Property without notifications so we don't refresh the table with fresh contents
             // and avoid problems with tab traversal
             if(isMultiSelection()) {
@@ -940,18 +732,16 @@ public class UserPropertiesSection extends AbstractECorePropertySection {
         @Override
         protected CellEditor getCellEditor(Object element) {
             if(element instanceof IProperty p) {
-                String[] restrictedValues = RESTRICTED_PROPERTY_VALUES.get(p.getKey());
+                String[] restrictedValues = PropertyDecoratorRegistry.getRestrictedValues(p.getKey());
                 if(restrictedValues != null) {
                     cellEditor.setItems(restrictedValues);
                     cellEditor.setEditable(false);
                     return cellEditor;
                 }
             }
-            
+
             cellEditor.setEditable(true);
-            String[] items = isAlive(getFirstSelectedElement()) 
-                ? getAllUniquePropertyValuesForKeyForModel(((IProperty)element).getKey(), MAX_ITEMS_COMBO) 
-                : new String[0];
+            String[] items = isAlive(getFirstSelectedElement()) ? getAllUniquePropertyValuesForKeyForModel(((IProperty)element).getKey(), MAX_ITEMS_COMBO) : new String[0];
             cellEditor.setItems(items);
             return cellEditor;
         }
@@ -987,52 +777,17 @@ public class UserPropertiesSection extends AbstractECorePropertySection {
                 }
             }
             
-            
+            // Decorator side effects (folder move, label expression, etc.)
             if(element instanceof IProperty p) {
-                String suffixTemplate = NAME_SUFFIX_TRIGGERS.get(p.getKey());
-                if(suffixTemplate != null && getFirstSelectedElement() instanceof IDiagramModel diagram) {
-                    String baseName = stripSuffix(diagram.getName());
-                    String newName = ((String)value).isEmpty()
-                        ? baseName
-                        : baseName + " " + suffixTemplate.replace("{value}", (String)value);
-                    Command renameCmd = new EObjectFeatureCommand(
-                        "Rename Diagram",
-                        diagram,
-                        IArchimatePackage.Literals.NAMEABLE__NAME,
-                        newName
-                    );
-                    compoundCmd.add(renameCmd);
-                }
-            }
-            
-            
-       
-            if(element instanceof IProperty p) {
-                String folderTrigger = FOLDER_TRIGGERS.get(p.getKey());
-                if(folderTrigger != null) {
+                IPropertyDecorator decorator = PropertyDecoratorRegistry.getDecorator(p.getKey());
+                if(decorator != null) {
                     for(IProperties propertiesElement : fPropertiesElements) {
-                        if(!(propertiesElement instanceof IArchimateElement el)) continue;
-                        IArchimateModel model = el.getArchimateModel();
-                        if(model == null) continue;
-                        IFolder currentFolder = (IFolder)el.eContainer();
-
-                        if(!((String)value).isEmpty()) {
-                            IFolder targetFolder = getOrCreateLevelFolder(model, el, (String)value);
-                            if(targetFolder != null && !targetFolder.equals(currentFolder)) {
-                                compoundCmd.add(new MoveObjectCommand(targetFolder, el));
-                            }
+                        if(propertiesElement instanceof IArchimateElement el) {
+                            decorator.contributeCommands(el, (String)value, compoundCmd);
                         }
-                        else {
-                            IFolder rootFolder = model.getDefaultFolderForObject(el);
-                            if(rootFolder != null && !rootFolder.equals(currentFolder)) {
-                                compoundCmd.add(new MoveObjectCommand(rootFolder, el));
-                            }
-                        }
-                        setDiagramObjectsLabelExpression(el, (String)value, compoundCmd);
                     }
                 }
             }
-            
             
             // If multi-selection update the local Property without notifications so we don't refresh the table with fresh contents
             // and avoid problems with tab traversal
