@@ -239,6 +239,23 @@ public class TreeModelViewActionFactory {
                 IDiagramModel diagramModel = IArchimateFactory.eINSTANCE.createArchimateDiagramModel();
                 diagramModel.setName(Messages.TreeModelViewActionFactory_1);
                 
+<<<<<<< Updated upstream
+=======
+                
+                IProperty ModelLevelProperty = IArchimateFactory.eINSTANCE.createProperty();
+                ModelLevelProperty.setKey("Model Level"); //$NON-NLS-1$
+                diagramModel.getProperties().add(ModelLevelProperty);
+                
+                IProperty previousIterationProperty = IArchimateFactory.eINSTANCE.createProperty();
+                previousIterationProperty.setKey("Previous Iteration"); //$NON-NLS-1$
+                diagramModel.getProperties().add(previousIterationProperty);
+
+                // Add Next Iteration property
+                IProperty nextIterationProperty = IArchimateFactory.eINSTANCE.createProperty();
+                nextIterationProperty.setKey("Next Iteration"); //$NON-NLS-1$
+                diagramModel.getProperties().add(nextIterationProperty);
+                
+>>>>>>> Stashed changes
                 // Execute Command
                 Command cmd = new NewDiagramCommand(folder, diagramModel, Messages.TreeModelViewActionFactory_1);
                 CommandStack commandStack = (CommandStack)folder.getAdapter(CommandStack.class);
