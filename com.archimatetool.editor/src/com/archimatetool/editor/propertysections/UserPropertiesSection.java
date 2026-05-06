@@ -99,7 +99,7 @@ import com.archimatetool.model.IArchimatePackage;
 import com.archimatetool.model.IProperties;
 import com.archimatetool.model.IProperty;
 import com.archimatetool.model.util.LightweightEContentAdapter;
-
+import com.archimatetool.model.IArchimateElement;
 
 
 /**
@@ -224,6 +224,39 @@ public class UserPropertiesSection extends AbstractECorePropertySection {
         
         // Locked
         updateLocked();
+        injectMissingProperties();
+    }
+    
+    private void injectMissingProperties() {
+        if(fPropertiesElements.isEmpty()) return;
+
+        for(IProperties target : fPropertiesElements) {
+            if(!(target instanceof IArchimateElement)) continue;
+
+            boolean added = false;
+            ((org.eclipse.emf.ecore.EObject)target).eSetDeliver(false);
+            try {
+                for(IPropertyDecorator decorator : PropertyDecoratorRegistry.getAllDecorators()) {
+                    String key = decorator.getPropertyKey();
+                    boolean alreadyExists = target.getProperties().stream()
+                        .anyMatch(p -> key.equals(p.getKey()));
+                    if(!alreadyExists) {
+                        IProperty newProperty = IArchimateFactory.eINSTANCE.createProperty();
+                        newProperty.setKey(key);
+                        newProperty.setValue(""); //$NON-NLS-1$
+                        target.getProperties().add(newProperty);
+                        added = true;
+                    }
+                }
+            }
+            finally {
+                ((org.eclipse.emf.ecore.EObject)target).eSetDeliver(true);
+            }
+
+            if(added) {
+                fTableViewer.refresh();
+            }
+        }
     }
     
     private void updateLocked() {
@@ -731,6 +764,16 @@ public class UserPropertiesSection extends AbstractECorePropertySection {
 
         @Override
         protected CellEditor getCellEditor(Object element) {
+            if(element instanceof IProperty p) {
+                String[] restrictedValues = PropertyDecoratorRegistry.getRestrictedValues(p.getKey());
+                if(restrictedValues != null) {
+                    cellEditor.setItems(restrictedValues);
+                    cellEditor.setEditable(false);
+                    return cellEditor;
+                }
+            }
+
+            cellEditor.setEditable(true);
             String[] items = isAlive(getFirstSelectedElement()) ? getAllUniquePropertyValuesForKeyForModel(((IProperty)element).getKey(), MAX_ITEMS_COMBO) : new String[0];
             cellEditor.setItems(items);
             return cellEditor;
@@ -762,6 +805,18 @@ public class UserPropertiesSection extends AbstractECorePropertySection {
                         Command cmd = new EObjectFeatureCommand(Messages.UserPropertiesSection_11, property, IArchimatePackage.Literals.PROPERTY__VALUE, value);
                         if(cmd.canExecute()) {
                             compoundCmd.add(cmd);
+                        }
+                    }
+                }
+            }
+            
+            // Decorator side effects (folder move, label expression, etc.)
+            if(element instanceof IProperty p) {
+                IPropertyDecorator decorator = PropertyDecoratorRegistry.getDecorator(p.getKey());
+                if(decorator != null) {
+                    for(IProperties propertiesElement : fPropertiesElements) {
+                        if(propertiesElement instanceof IArchimateElement el) {
+                            decorator.contributeCommands(el, (String)value, compoundCmd);
                         }
                     }
                 }
