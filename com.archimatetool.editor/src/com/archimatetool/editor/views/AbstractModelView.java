@@ -340,19 +340,19 @@ implements IContextProvider, PropertyChangeListener, ITabbedPropertySheetPageCon
             }
         }
         else if(type == Notification.SET) {
-            // Need to refresh parent node on name or label expression change because of using a ViewerSorter
             if(msg.getNotifier() instanceof EObject) {
                 element = ((EObject)msg.getNotifier());
                 
-                // Name
+                if(msg.getNotifier() instanceof IProperty prop && "Model Level".equals(prop.getKey())) {
+                    return null;
+                }
+                
                 if(msg.getFeature() == IArchimatePackage.Literals.NAMEABLE__NAME) {
                     element = element.eContainer();
                 }
-                // Ancestor folder has label expression
                 else if(hasFormatExpression(element)) {
                     element = element.eContainer();
                     
-                    // Property set
                     if(msg.getNotifier() instanceof IProperty) {
                         element = element.eContainer();
                     }
@@ -387,6 +387,11 @@ implements IContextProvider, PropertyChangeListener, ITabbedPropertySheetPageCon
         
         // If notifier is a folder ignore
         if(msg.getNotifier() instanceof IFolder) {
+            return list;
+        }
+        
+        // If notifier is a system-managed property, skip expensive relationship scan
+        if(msg.getNotifier() instanceof IProperty prop && "Model Level".equals(prop.getKey())) {
             return list;
         }
         

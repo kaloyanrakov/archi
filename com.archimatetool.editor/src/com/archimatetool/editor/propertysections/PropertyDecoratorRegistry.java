@@ -14,6 +14,7 @@ public class PropertyDecoratorRegistry {
         // Iteration decorators (for diagram views)
         decorators.add(new IterationPropertyDecorator(IterationPropertyDecorator.PROPERTY_PREVIOUS_ITERATION));
         decorators.add(new IterationPropertyDecorator(IterationPropertyDecorator.PROPERTY_NEXT_ITERATION));
+
     }
 
     public static IPropertyDecorator getDecorator(String propertyKey) {

@@ -35,7 +35,7 @@ import com.archimatetool.model.IFolder;
 import com.archimatetool.model.IProfile;
 import com.archimatetool.model.ISketchModel;
 import com.archimatetool.model.util.ArchimateModelUtils;
-
+import com.archimatetool.model.IProperty;
 
 
 /**
@@ -238,9 +238,7 @@ public class TreeModelViewActionFactory {
                 // Create a new Diagram Model, set its name
                 IDiagramModel diagramModel = IArchimateFactory.eINSTANCE.createArchimateDiagramModel();
                 diagramModel.setName(Messages.TreeModelViewActionFactory_1);
-                
-<<<<<<< Updated upstream
-=======
+            
                 
                 IProperty ModelLevelProperty = IArchimateFactory.eINSTANCE.createProperty();
                 ModelLevelProperty.setKey("Model Level"); //$NON-NLS-1$
@@ -255,7 +253,6 @@ public class TreeModelViewActionFactory {
                 nextIterationProperty.setKey("Next Iteration"); //$NON-NLS-1$
                 diagramModel.getProperties().add(nextIterationProperty);
                 
->>>>>>> Stashed changes
                 // Execute Command
                 Command cmd = new NewDiagramCommand(folder, diagramModel, Messages.TreeModelViewActionFactory_1);
                 CommandStack commandStack = (CommandStack)folder.getAdapter(CommandStack.class);

@@ -61,8 +61,6 @@ import com.archimatetool.model.INameable;
 import com.archimatetool.model.IProfile;
 
 
-
-
 /**
  * Tree Viewer for Model Tree View
  * 
@@ -88,6 +86,51 @@ public class TreeModelViewer extends TreeViewer {
     private Object[] rootVisibleExpandedElements;
     
     private boolean useAlphanumericComparator = ArchiPlugin.getInstance().getPreferenceStore().getBoolean(IPreferenceConstants.TREE_ALPHANUMERIC_SORT);
+    
+    /**
+     * Named inner class for the comparator so we can access its cache from refresh()
+     */
+    private class TreeComparator extends ViewerComparator {
+        private final Comparator<String> alphanumericComparator = new AlphanumericComparator(getComparator());
+        
+        // Cache label lookups per sort pass - cleared on refresh()
+        final Map<Object, String> labelCache = new HashMap<>();
+        
+        @Override
+        public int compare(Viewer viewer, Object e1, Object e2) {
+            int cat1 = category(e1);
+            int cat2 = category(e2);
+
+            if(cat1 != cat2) {
+                return cat1 - cat2;
+            }
+            
+            // Only user folders are sorted
+            if((e1 instanceof IFolder folder1 && e2 instanceof IFolder folder2) && (folder1.getType() != FolderType.USER 
+                    || folder2.getType() != FolderType.USER)) {
+                return 0;
+            }
+            
+            String label1 = labelCache.computeIfAbsent(e1, k -> {
+                String t = getAncestorFolderRenderText((IArchimateModelObject)k);
+                return t != null ? t : StringUtils.safeString(ArchiLabelProvider.INSTANCE.getLabelNormalised(k));
+            });
+
+            String label2 = labelCache.computeIfAbsent(e2, k -> {
+                String t = getAncestorFolderRenderText((IArchimateModelObject)k);
+                return t != null ? t : StringUtils.safeString(ArchiLabelProvider.INSTANCE.getLabelNormalised(k));
+            });
+            
+            return useAlphanumericComparator ? alphanumericComparator.compare(label1, label2) : getComparator().compare(label1, label2);
+        }
+        
+        @Override
+        public int category(Object element) {
+            return element instanceof IFolder ? 0 : 1;
+        }
+    }
+    
+    private final TreeComparator treeComparator = new TreeComparator();
     
     /**
      * Listener for theme font change
@@ -122,45 +165,7 @@ public class TreeModelViewer extends TreeViewer {
         setDisplayIncrementally(limit);
         
         // Sort
-        setComparator(new ViewerComparator(Collator.getInstance()) {
-            Comparator<String> alphanumericComparator = new AlphanumericComparator(getComparator());
-            
-            @Override
-            public int compare(Viewer viewer, Object e1, Object e2) {
-                int cat1 = category(e1);
-                int cat2 = category(e2);
-
-                if(cat1 != cat2) {
-                    return cat1 - cat2;
-                }
-                
-                // Only user folders are sorted
-                if((e1 instanceof IFolder folder1 && e2 instanceof IFolder folder2) && (folder1.getType() != FolderType.USER 
-                        || folder2.getType() != FolderType.USER)) {
-                    return 0;
-                }
-                
-                // Get rendered text or name
-                String label1 = getAncestorFolderRenderText((IArchimateModelObject)e1);
-                if(label1 == null) {
-                    label1 = StringUtils.safeString(ArchiLabelProvider.INSTANCE.getLabelNormalised(e1));
-                }
-
-                // Get rendered text or name
-                String label2 = getAncestorFolderRenderText((IArchimateModelObject)e2);
-                if(label2 == null) {
-                    label2 = StringUtils.safeString(ArchiLabelProvider.INSTANCE.getLabelNormalised(e2));
-                }
-                
-                // Use either alphanumeric compare or default
-                return useAlphanumericComparator ? alphanumericComparator.compare(label1, label2) : getComparator().compare(label1, label2);
-            }
-            
-            @Override
-            public int category(Object element) {
-                return element instanceof IFolder ? 0 : 1;
-            }
-        });
+        setComparator(treeComparator);
         
         // Cell Editor
         TreeTextCellEditor cellEditor = new TreeTextCellEditor(getTree());
@@ -225,6 +230,27 @@ public class TreeModelViewer extends TreeViewer {
     void setUseAlphanumericComparator(boolean value) {
         useAlphanumericComparator = value;
         refreshTreePreservingExpandedNodes();
+    }
+    
+    /**
+     * Override refresh to clear label caches so they are re-evaluated on next paint/sort
+     */
+    @Override
+    public void refresh() {
+        treeComparator.labelCache.clear();
+        if(getLabelProvider() instanceof ModelTreeViewerLabelProvider lp) {
+            lp.renderTextCache.clear();
+        }
+        super.refresh();
+    }
+
+    @Override
+    public void refresh(Object element) {
+        treeComparator.labelCache.clear();
+        if(getLabelProvider() instanceof ModelTreeViewerLabelProvider lp) {
+            lp.renderTextCache.clear();
+        }
+        super.refresh(element);
     }
     
     /**
@@ -456,11 +482,11 @@ public class TreeModelViewer extends TreeViewer {
         @Override
         public Object[] getChildren(Object parentElement) {
             if(parentElement instanceof IEditorModelManager editorModelManager) {
-            	return editorModelManager.getModels().toArray();
+                return editorModelManager.getModels().toArray();
             }
             
             if(parentElement instanceof IArchimateModel model) {
-            	return model.getFolders().toArray();
+                return model.getFolders().toArray();
             }
 
             if(parentElement instanceof IFolder folder) {
@@ -487,7 +513,7 @@ public class TreeModelViewer extends TreeViewer {
 
         @Override
         public boolean hasChildren(Object element) {
-        	return getFilteredChildren(element).length > 0;
+            return getFilteredChildren(element).length > 0;
         }
     }
     
@@ -495,6 +521,10 @@ public class TreeModelViewer extends TreeViewer {
      * Label Provider
      */
     private class ModelTreeViewerLabelProvider extends CellLabelProvider {
+        
+        // Cache render text lookups per paint cycle - cleared on refresh()
+        final Map<String, String> renderTextCache = new HashMap<>();
+        
         private Font fontItalic;
         private Font fontBold;
         private Font fontBoldItalic;
@@ -522,9 +552,20 @@ public class TreeModelViewer extends TreeViewer {
 
         private String getText(Object element) {
             // If a Concept or a View's parent or ancestor parent folder has a text expression, evaluate it
-            String text = getAncestorFolderRenderText((IArchimateModelObject)element);
-            if(text != null) {
-                return text;
+            // Use cache to avoid repeated folder-walk on every repaint
+            if(element instanceof IArchimateModelObject modelObj) {
+                String id = modelObj.getId();
+                if(id != null) {
+                    String cached = renderTextCache.get(id);
+                    if(cached == null) {
+                        String rendered = getAncestorFolderRenderText(modelObj);
+                        cached = rendered != null ? rendered : "";
+                        renderTextCache.put(id, cached);
+                    }
+                    if(!cached.isEmpty()) {
+                        return cached;
+                    }
+                }
             }
             
             String name = ArchiLabelProvider.INSTANCE.getLabelNormalised(element);
@@ -608,6 +649,7 @@ public class TreeModelViewer extends TreeViewer {
                 image.dispose();
             }
             imageCache.clear();
+            renderTextCache.clear();
         }
     }
     
