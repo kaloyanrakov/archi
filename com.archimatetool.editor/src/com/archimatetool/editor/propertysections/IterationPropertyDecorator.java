@@ -23,13 +23,12 @@ public class IterationPropertyDecorator implements IPropertyDecorator {
 
     @Override
     public String[] getRestrictedValues() {
-        // Return empty array — values will be populated dynamically from available diagrams
         return new String[]{""};
     }
 
     @Override
     public void contributeCommands(IArchimateElement element, String newValue, CompoundCommand cmd) {
-        // For diagram models, validate iteration references
+        // Only handle IDiagramModel (views), not regular elements
         if(element instanceof IDiagramModel diagram) {
             validateIterationReferences(diagram, newValue, cmd);
         }

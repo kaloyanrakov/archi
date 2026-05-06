@@ -100,6 +100,9 @@ import com.archimatetool.model.IProperties;
 import com.archimatetool.model.IProperty;
 import com.archimatetool.model.util.LightweightEContentAdapter;
 import com.archimatetool.model.IArchimateElement;
+import com.archimatetool.editor.propertysections.IterationPropertyDecorator;
+import com.archimatetool.editor.propertysections.LevelingPropertyDecorator;
+import com.archimatetool.model.IDiagramModel;
 
 
 /**
@@ -231,12 +234,31 @@ public class UserPropertiesSection extends AbstractECorePropertySection {
         if(fPropertiesElements.isEmpty()) return;
 
         for(IProperties target : fPropertiesElements) {
-            if(!(target instanceof IArchimateElement)) continue;
+            // Must be either an IArchimateElement OR an IDiagramModel
+            if(!(target instanceof IArchimateElement) && !(target instanceof IDiagramModel)) {
+                continue;
+            }
 
             boolean added = false;
             ((org.eclipse.emf.ecore.EObject)target).eSetDeliver(false);
             try {
                 for(IPropertyDecorator decorator : PropertyDecoratorRegistry.getAllDecorators()) {
+                    // Determine which properties apply to this element type
+                    boolean shouldAdd = false;
+                    
+                    if(decorator instanceof IterationPropertyDecorator) {
+                        // Iteration properties only for IDiagramModel (views)
+                        shouldAdd = target instanceof IDiagramModel;
+                    }
+                    else if(decorator instanceof LevelingPropertyDecorator) {
+                        // Leveling property only for IArchimateElement (objects, not views)
+                        shouldAdd = (target instanceof IArchimateElement) && !(target instanceof IDiagramModel);
+                    }
+                    
+                    if(!shouldAdd) {
+                        continue;
+                    }
+                    
                     String key = decorator.getPropertyKey();
                     boolean alreadyExists = target.getProperties().stream()
                         .anyMatch(p -> key.equals(p.getKey()));

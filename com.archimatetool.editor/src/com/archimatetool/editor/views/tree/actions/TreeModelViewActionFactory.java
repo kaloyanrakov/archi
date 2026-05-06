@@ -35,6 +35,7 @@ import com.archimatetool.model.IFolder;
 import com.archimatetool.model.IProfile;
 import com.archimatetool.model.ISketchModel;
 import com.archimatetool.model.util.ArchimateModelUtils;
+import com.archimatetool.model.IProperty;
 
 
 
