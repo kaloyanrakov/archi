@@ -786,9 +786,16 @@ public class UserPropertiesSection extends AbstractECorePropertySection {
 
         @Override
         protected CellEditor getCellEditor(Object element) {
+            
             if(element instanceof IProperty p) {
-                String[] restrictedValues = PropertyDecoratorRegistry.getRestrictedValues(p.getKey());
-                if(restrictedValues != null) {
+                IProperties firstSelected = getFirstSelectedElement();
+
+                
+                // Use context-aware restricted values, passing the IProperties object directly
+                String[] restrictedValues = PropertyDecoratorRegistry.getRestrictedValues(p.getKey(), firstSelected);
+                
+                
+                if(restrictedValues != null && restrictedValues.length > 0) {
                     cellEditor.setItems(restrictedValues);
                     cellEditor.setEditable(false);
                     return cellEditor;

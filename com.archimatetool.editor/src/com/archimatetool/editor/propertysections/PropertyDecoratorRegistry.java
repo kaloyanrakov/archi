@@ -3,6 +3,8 @@ package com.archimatetool.editor.propertysections;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.archimatetool.model.IProperties;
+
 public class PropertyDecoratorRegistry {
 
     private static final List<IPropertyDecorator> decorators = new ArrayList<>();
@@ -26,6 +28,17 @@ public class PropertyDecoratorRegistry {
     public static String[] getRestrictedValues(String propertyKey) {
         IPropertyDecorator d = getDecorator(propertyKey);
         return d != null ? d.getRestrictedValues() : null;
+    }
+    
+    /**
+     * Get restricted values with IProperties context (can be IArchimateElement or IDiagramModel)
+     */
+    public static String[] getRestrictedValues(String propertyKey, IProperties element) {
+        IPropertyDecorator d = getDecorator(propertyKey);
+        if(d != null) {
+            return d.getRestrictedValues(element);
+        }
+        return null;
     }
 
     public static List<IPropertyDecorator> getAllDecorators() {
