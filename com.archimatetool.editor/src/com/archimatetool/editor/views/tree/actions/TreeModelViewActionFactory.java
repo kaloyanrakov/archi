@@ -35,7 +35,7 @@ import com.archimatetool.model.IFolder;
 import com.archimatetool.model.IProfile;
 import com.archimatetool.model.ISketchModel;
 import com.archimatetool.model.util.ArchimateModelUtils;
-import com.archimatetool.model.IProperty;
+
 
 
 /**
@@ -238,7 +238,7 @@ public class TreeModelViewActionFactory {
                 // Create a new Diagram Model, set its name
                 IDiagramModel diagramModel = IArchimateFactory.eINSTANCE.createArchimateDiagramModel();
                 diagramModel.setName(Messages.TreeModelViewActionFactory_1);
-            
+
                 
                 IProperty ModelLevelProperty = IArchimateFactory.eINSTANCE.createProperty();
                 ModelLevelProperty.setKey("Model Level"); //$NON-NLS-1$
