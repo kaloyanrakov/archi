@@ -203,6 +203,12 @@ public class UserPropertiesSection extends AbstractECorePropertySection {
         }
     }
     
+    private static boolean isReadOnlyProperty(String key) {
+        return "Model Level".equals(key)
+            || "Previous Iteration".equals(key)
+            || "Next Iteration".equals(key);
+    }
+    
     @Override
     protected void removeAdapter() {
         if(getEObjects() != null && getECoreAdapter() != null) {
@@ -723,7 +729,7 @@ public class UserPropertiesSection extends AbstractECorePropertySection {
 
         @Override
         protected boolean canEdit(Object element) {
-            return true;
+            return !isReadOnlyProperty(((IProperty)element).getKey());
         }
 
         @Override
@@ -810,7 +816,7 @@ public class UserPropertiesSection extends AbstractECorePropertySection {
 
         @Override
         protected boolean canEdit(Object element) {
-            return true;
+            return !isReadOnlyProperty(((IProperty)element).getKey());
         }
 
         @Override
@@ -1230,10 +1236,13 @@ public class UserPropertiesSection extends AbstractECorePropertySection {
             CompoundCommand cmd = isMultiSelection() ? new CompoundCommand() : new EObjectNonNotifyingCompoundCommand(getFirstSelectedElement());
             
             for(Object o : ((IStructuredSelection)fTableViewer.getSelection()).toList()) {
-                IProperty property = (IProperty)o;
-                
+                IProperty selectedProperty = (IProperty)o;          // use a separate final-ish variable
+                if(isReadOnlyProperty(selectedProperty.getKey())) {
+                    continue; // skip protected properties
+                }
                 for(IProperties propertiesElement : fPropertiesElements) {
                     if(isAlive(propertiesElement)) {
+                        IProperty property = selectedProperty;      // local copy for this inner scope
                         if(isMultiSelection()) {
                             property = getFirstMatchingProperty(propertiesElement.getProperties(), property);
                         }
