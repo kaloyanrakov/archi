@@ -16,7 +16,6 @@ public interface IPropertyDecorator {
     }
     
     default String[] getRestrictedValues(IProperties element) {
-        // Default implementation: if it's IArchimateElement, use that method
         if(element instanceof IArchimateElement ae) {
             return getRestrictedValues(ae);
         }
@@ -24,4 +23,10 @@ public interface IPropertyDecorator {
     }
 
     void contributeCommands(IArchimateElement element, String newValue, CompoundCommand cmd);
+    
+    default void contributeCommands(IProperties element, String newValue, CompoundCommand cmd) {
+        if(element instanceof IArchimateElement ae) {
+            contributeCommands(ae, newValue, cmd);
+        }
+    }
 }

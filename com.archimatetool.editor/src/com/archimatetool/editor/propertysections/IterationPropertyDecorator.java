@@ -1,9 +1,13 @@
 package com.archimatetool.editor.propertysections;
 
+import org.eclipse.gef.commands.Command;
 import org.eclipse.gef.commands.CompoundCommand;
 
 import com.archimatetool.model.IArchimateElement;
 import com.archimatetool.model.IDiagramModel;
+import com.archimatetool.model.IArchimateFactory;
+import com.archimatetool.model.IProperties;
+import com.archimatetool.model.IProperty;
 
 public class IterationPropertyDecorator implements IPropertyDecorator {
 
@@ -23,15 +27,14 @@ public class IterationPropertyDecorator implements IPropertyDecorator {
 
     @Override
     public String[] getRestrictedValues() {
-        // Default empty array - should use context-aware version
         return new String[]{""};
     }
 
     /**
-     * Get available diagrams dynamically based on the current diagram
+     * Get available diagrams dynamically - accepts IProperties for both elements and diagrams
      */
     @Override
-    public String[] getRestrictedValues(com.archimatetool.model.IProperties element) {
+    public String[] getRestrictedValues(IProperties element) {
         if(!(element instanceof IDiagramModel currentDiagram)) {
             return new String[]{""};
         }
@@ -55,14 +58,46 @@ public class IterationPropertyDecorator implements IPropertyDecorator {
 
     @Override
     public void contributeCommands(IArchimateElement element, String newValue, CompoundCommand cmd) {
+        // This is for regular elements - do nothing for iterations
+    }
+    
+    /**
+     * Handle IDiagramModel for iteration properties
+     */
+    @Override
+    public void contributeCommands(IProperties element, String newValue, CompoundCommand cmd) {
+                
         // Only handle IDiagramModel (views), not regular elements
         if(element instanceof IDiagramModel diagram) {
+            
             validateIterationReferences(diagram, newValue, cmd);
+        }
+        else if(element instanceof IArchimateElement ae) {
+            // Delegate to the old method for regular elements
+            contributeCommands(ae, newValue, cmd);
         }
     }
 
     private void validateIterationReferences(IDiagramModel diagram, String newValue, CompoundCommand cmd) {
+       
+        
         if(newValue == null || newValue.isEmpty()) {
+            
+            // If clearing the property, also clear the reciprocal relationship
+            if(PROPERTY_NEXT_ITERATION.equals(propertyKey)) {
+                IDiagramModel nextDiagram = getReferencedDiagram(diagram, propertyKey);
+                
+                if(nextDiagram != null) {
+                    cmd.add(new SetPropertyCommand(nextDiagram, PROPERTY_PREVIOUS_ITERATION, ""));
+                }
+            }
+            else if(PROPERTY_PREVIOUS_ITERATION.equals(propertyKey)) {
+                IDiagramModel prevDiagram = getReferencedDiagram(diagram, propertyKey);
+               
+                if(prevDiagram != null) {
+                    cmd.add(new SetPropertyCommand(prevDiagram, PROPERTY_NEXT_ITERATION, ""));
+                }
+            }
             return;
         }
 
@@ -74,15 +109,19 @@ public class IterationPropertyDecorator implements IPropertyDecorator {
         // Prevent circular references
         if(PROPERTY_PREVIOUS_ITERATION.equals(propertyKey)) {
             validateNoPreviousCircularReference(diagram, referenced);
+            // Set the reciprocal: referenced's next should point to diagram
+            cmd.add(new SetPropertyCommand(referenced, PROPERTY_NEXT_ITERATION, diagram.getName()));
         }
         else if(PROPERTY_NEXT_ITERATION.equals(propertyKey)) {
+            
             validateNoNextCircularReference(diagram, referenced);
+            // Set the reciprocal: referenced's previous should point to diagram
+            cmd.add(new SetPropertyCommand(referenced, PROPERTY_PREVIOUS_ITERATION, diagram.getName()));
         }
     }
 
     private void validateNoPreviousCircularReference(IDiagramModel current, IDiagramModel previous) {
-        // Check if previous diagram points back to this one as next
-        com.archimatetool.model.IProperty nextIterProp = previous.getProperties().stream()
+        IProperty nextIterProp = previous.getProperties().stream()
             .filter(p -> PROPERTY_NEXT_ITERATION.equals(p.getKey()))
             .findFirst()
             .orElse(null);
@@ -95,8 +134,7 @@ public class IterationPropertyDecorator implements IPropertyDecorator {
     }
 
     private void validateNoNextCircularReference(IDiagramModel current, IDiagramModel next) {
-        // Check if next diagram points back to this one as previous
-        com.archimatetool.model.IProperty prevIterProp = next.getProperties().stream()
+        IProperty prevIterProp = next.getProperties().stream()
             .filter(p -> PROPERTY_PREVIOUS_ITERATION.equals(p.getKey()))
             .findFirst()
             .orElse(null);
@@ -118,15 +156,61 @@ public class IterationPropertyDecorator implements IPropertyDecorator {
             .findFirst()
             .orElse(null);
     }
+    
+    private IDiagramModel getReferencedDiagram(IDiagramModel diagram, String propertyKey) {
+        IProperty prop = diagram.getProperties().stream()
+            .filter(p -> propertyKey.equals(p.getKey()))
+            .findFirst()
+            .orElse(null);
+        
+        if(prop != null && prop.getValue() != null && !prop.getValue().isEmpty()) {
+            return findDiagramByName(diagram, prop.getValue());
+        }
+        return null;
+    }
 
-    public static String[] getAvailableDiagrams(IDiagramModel currentDiagram) {
-        if(currentDiagram == null || currentDiagram.getArchimateModel() == null) {
-            return new String[]{""};
+    /**
+     * Command to set a property value
+     */
+    private static class SetPropertyCommand extends Command {
+        private IDiagramModel diagram;
+        private String propertyKey;
+        private String newValue;
+        private String oldValue;
+        
+        SetPropertyCommand(IDiagramModel diagram, String propertyKey, String newValue) {
+            this.diagram = diagram;
+            this.propertyKey = propertyKey;
+            this.newValue = newValue;
         }
         
-        return currentDiagram.getArchimateModel().getDiagramModels().stream()
-            .filter(d -> !d.equals(currentDiagram))
-            .map(d -> d.getName())
-            .toArray(String[]::new);
+        @Override
+        public void execute() {
+            IProperty prop = diagram.getProperties().stream()
+                .filter(p -> propertyKey.equals(p.getKey()))
+                .findFirst()
+                .orElse(null);
+            
+            if(prop == null) {
+                prop = IArchimateFactory.eINSTANCE.createProperty();
+                prop.setKey(propertyKey);
+                diagram.getProperties().add(prop);
+            }
+            
+            oldValue = prop.getValue();
+            prop.setValue(newValue);
+        }
+        
+        @Override
+        public void undo() {
+            IProperty prop = diagram.getProperties().stream()
+                .filter(p -> propertyKey.equals(p.getKey()))
+                .findFirst()
+                .orElse(null);
+            
+            if(prop != null) {
+                prop.setValue(oldValue);
+            }
+        }
     }
 }

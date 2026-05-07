@@ -16,6 +16,7 @@ import org.eclipse.zest.core.viewers.IGraphContentProvider;
 import com.archimatetool.model.IArchimateConcept;
 import com.archimatetool.model.IArchimateElement;
 import com.archimatetool.model.IArchimateRelationship;
+import com.archimatetool.model.IDiagramModel;
 import com.archimatetool.model.util.ArchimateModelUtils;
 import com.archimatetool.model.viewpoints.IViewpoint;
 import com.archimatetool.model.viewpoints.ViewpointManager;
@@ -122,6 +123,13 @@ public class ZestViewerContentProvider implements IGraphContentProvider {
     
     @Override
     public Object[] getElements(Object inputElement) {
+        // Handle IDiagramModel input (show iteration chain)
+        if(inputElement instanceof IDiagramModel) {
+            Set<Object> mainList = new HashSet<>();
+            getIterationRelations(mainList, new HashSet<IDiagramModel>(), (IDiagramModel)inputElement, 0);
+            return mainList.toArray();
+        }
+        
         if(inputElement instanceof IArchimateConcept) {
             IArchimateConcept archimateConcept = (IArchimateConcept)inputElement;
             
@@ -147,6 +155,62 @@ public class ZestViewerContentProvider implements IGraphContentProvider {
     }
     
     /**
+     * Get all iteration relations from previous/next iterations and add to list, no more than DEPTH
+     */
+    private void getIterationRelations(Set<Object> mainList, Set<IDiagramModel> checkList, IDiagramModel diagram, int count) {
+        if(checkList.contains(diagram)) {
+            return;
+        }
+        
+        checkList.add(diagram);
+        
+        if(count > fDepth) {
+            return;
+        }
+        
+        count++;
+        
+        // Get previous iteration
+        com.archimatetool.model.IProperty prevIterProp = diagram.getProperties().stream()
+            .filter(p -> "Previous Iteration".equals(p.getKey())) //$NON-NLS-1$
+            .findFirst()
+            .orElse(null);
+        
+        if(prevIterProp != null && prevIterProp.getValue() != null && !prevIterProp.getValue().isEmpty()) {
+            IDiagramModel previousDiagram = findDiagramByName(diagram, prevIterProp.getValue());
+            if(previousDiagram != null && !checkList.contains(previousDiagram)) {
+                mainList.add(new IterationRelationship(previousDiagram, diagram));
+                getIterationRelations(mainList, checkList, previousDiagram, count);
+            }
+        }
+        
+        // Get next iteration
+        com.archimatetool.model.IProperty nextIterProp = diagram.getProperties().stream()
+            .filter(p -> "Next Iteration".equals(p.getKey())) //$NON-NLS-1$
+            .findFirst()
+            .orElse(null);
+        
+        if(nextIterProp != null && nextIterProp.getValue() != null && !nextIterProp.getValue().isEmpty()) {
+            IDiagramModel nextDiagram = findDiagramByName(diagram, nextIterProp.getValue());
+            if(nextDiagram != null && !checkList.contains(nextDiagram)) {
+                mainList.add(new IterationRelationship(diagram, nextDiagram));
+                getIterationRelations(mainList, checkList, nextDiagram, count);
+            }
+        }
+    }
+    
+    private IDiagramModel findDiagramByName(IDiagramModel current, String name) {
+        if(current.getArchimateModel() == null) {
+            return null;
+        }
+        
+        return current.getArchimateModel().getDiagramModels().stream()
+            .filter(d -> name.equals(d.getName()))
+            .findFirst()
+            .orElse(null);
+    }
+    
+    /**
      * Get all relations from source and target of concept and add to list, no more than DEPTH
      */
     private void getRelations(Set<IArchimateRelationship> mainList, Set<IArchimateConcept> checkList, IArchimateConcept concept, int count) {
@@ -168,7 +232,7 @@ public class ZestViewerContentProvider implements IGraphContentProvider {
 
             if(!mainList.contains(relationship) && fViewpoint.isAllowedConcept(other.eClass()) && isVisible(relationship)) {
                 if(direction == fDirection || fDirection == DIR_BOTH) {
-                    // If the other concept is an element and is selected to beshown
+                    // If the other concept is an element and is selected to be shown
                     if(other instanceof IArchimateElement && isVisible((IArchimateElement)other)) {
                         mainList.add(relationship);
                     }
@@ -188,6 +252,9 @@ public class ZestViewerContentProvider implements IGraphContentProvider {
         if(rel instanceof IArchimateRelationship) {
             return ((IArchimateRelationship)rel).getSource();
         }
+        if(rel instanceof IterationRelationship) {
+            return ((IterationRelationship)rel).getSource();
+        }
         return null;
     }
 
@@ -195,6 +262,9 @@ public class ZestViewerContentProvider implements IGraphContentProvider {
     public Object getDestination(Object rel) {
         if(rel instanceof IArchimateRelationship) {
             return ((IArchimateRelationship)rel).getTarget();
+        }
+        if(rel instanceof IterationRelationship) {
+            return ((IterationRelationship)rel).getTarget();
         }
         return null;
     }
@@ -208,7 +278,7 @@ public class ZestViewerContentProvider implements IGraphContentProvider {
         // Level filter
         if(fLevelFilter != null) {
             boolean hasMatchingLevel = element.getProperties().stream()
-                .anyMatch(p -> "Model Level".equals(p.getKey()) && fLevelFilter.equals(p.getValue()));
+                .anyMatch(p -> "Model Level".equals(p.getKey()) && fLevelFilter.equals(p.getValue())); //$NON-NLS-1$
             if(!hasMatchingLevel) {
                 return false;
             }

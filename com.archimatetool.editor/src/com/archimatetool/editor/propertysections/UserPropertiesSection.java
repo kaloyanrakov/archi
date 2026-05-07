@@ -844,9 +844,8 @@ public class UserPropertiesSection extends AbstractECorePropertySection {
                 IPropertyDecorator decorator = PropertyDecoratorRegistry.getDecorator(p.getKey());
                 if(decorator != null) {
                     for(IProperties propertiesElement : fPropertiesElements) {
-                        if(propertiesElement instanceof IArchimateElement el) {
-                            decorator.contributeCommands(el, (String)value, compoundCmd);
-                        }
+                        // Call the IProperties version which handles both IArchimateElement and IDiagramModel
+                        decorator.contributeCommands(propertiesElement, (String)value, compoundCmd);
                     }
                 }
             }
