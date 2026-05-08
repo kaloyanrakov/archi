@@ -192,6 +192,23 @@ public class UserPropertiesSection extends AbstractECorePropertySection {
         }
     }
     
+    private static boolean isIterationProperty(String key) {
+        if(key == null) return false;
+        String lower = key.toLowerCase();
+        return lower.equals("previous iteration") || lower.equals("next iteration");
+    }
+
+    private String[] getAllViewNamesForModel() {
+        IArchimateModel model = getArchimateModel();
+        if(model == null) return new String[0];
+        
+        return model.getDiagramModels().stream()
+            .map(IDiagramModel::getName)
+            .filter(name -> name != null && !name.isBlank())
+            .sorted(String.CASE_INSENSITIVE_ORDER)
+            .toArray(String[]::new);
+    }
+    
     @Override
     protected void addAdapter() {
         if(getEObjects() != null && getECoreAdapter() != null) {
@@ -202,6 +219,12 @@ public class UserPropertiesSection extends AbstractECorePropertySection {
             }
         }
     }
+    
+    private static final String[] MODEL_LEVEL_VALUES = {
+    	    "Level 1",
+    	    "Level 2",
+    	    "Level 3"
+    	};
     
     private static boolean isReadOnlyProperty(String key) {
         return "Model Level".equals(key)
@@ -792,31 +815,28 @@ public class UserPropertiesSection extends AbstractECorePropertySection {
 
         @Override
         protected CellEditor getCellEditor(Object element) {
+            IProperty property = (IProperty)element;
+            String[] items;
             
-            if(element instanceof IProperty p) {
-                IProperties firstSelected = getFirstSelectedElement();
-
-                
-                // Use context-aware restricted values, passing the IProperties object directly
-                String[] restrictedValues = PropertyDecoratorRegistry.getRestrictedValues(p.getKey(), firstSelected);
-                
-                
-                if(restrictedValues != null && restrictedValues.length > 0) {
-                    cellEditor.setItems(restrictedValues);
-                    cellEditor.setEditable(false);
-                    return cellEditor;
-                }
+            if(isIterationProperty(property.getKey())) {
+                items = getAllViewNamesForModel();
             }
-
-            cellEditor.setEditable(true);
-            String[] items = isAlive(getFirstSelectedElement()) ? getAllUniquePropertyValuesForKeyForModel(((IProperty)element).getKey(), MAX_ITEMS_COMBO) : new String[0];
+            else if("Model Level".equalsIgnoreCase(property.getKey())) {
+                items = MODEL_LEVEL_VALUES;
+            }
+            else {
+                items = isAlive(getFirstSelectedElement())
+                    ? getAllUniquePropertyValuesForKeyForModel(property.getKey(), MAX_ITEMS_COMBO)
+                    : new String[0];
+            }
+            
             cellEditor.setItems(items);
+            cellEditor.setEditable(!isReadOnlyProperty(property.getKey()));
             return cellEditor;
         }
-
         @Override
         protected boolean canEdit(Object element) {
-            return !isReadOnlyProperty(((IProperty)element).getKey());
+            return true;
         }
 
         @Override
