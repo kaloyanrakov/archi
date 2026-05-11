@@ -47,7 +47,9 @@ import com.archimatetool.model.IRealizationRelationship;
 import com.archimatetool.model.IServingRelationship;
 import com.archimatetool.model.ISpecializationRelationship;
 import com.archimatetool.model.ITriggeringRelationship;
-
+import org.eclipse.draw2d.PolygonDecoration;
+import com.archimatetool.model.IDiagramModel;
+import com.archimatetool.editor.propertysections.IterationPropertyDecorator.IterationConnection;
 
 /**
  * Label Provider
@@ -138,6 +140,12 @@ implements IBaseLabelProvider, ISelfStyleProvider {
     }
 
     public IFigure getTooltip(Object entity) {
+    	 if(entity instanceof IDiagramModel dm) {
+    	        ToolTipFigure l = new ToolTipFigure();
+    	        l.setText(ArchiLabelProvider.INSTANCE.getLabel(dm));
+    	        l.setType("View"); //$NON-NLS-1$
+    	        return l;
+    	    }
         if(entity instanceof IArchimateConcept) {
             ToolTipFigure l = new ToolTipFigure();
             String type = ArchiLabelProvider.INSTANCE.getDefaultName(((EObject)entity).eClass());
@@ -177,6 +185,17 @@ implements IBaseLabelProvider, ISelfStyleProvider {
     
     @Override
     public void selfStyleConnection(Object element, GraphConnection connection) {
+    	if(element instanceof IterationConnection ic) {
+            connection.setLineColor(ColorConstants.darkBlue);
+            connection.setLineWidth(2);
+            connection.setText(ic.getType()); // shows "Next Iteration" / "Previous Iteration"
+            connection.setTooltip(null);
+            PolylineConnection conn = (PolylineConnection)connection.getConnectionFigure();
+            conn.setTargetDecoration(new PolygonDecoration()); // filled arrowhead
+            conn.setAntialias(SWT.ON);
+            return;
+        }
+    	
         connection.setLineWidth(0);
         connection.setTooltip(getTooltip(element));
         connection.setLineColor(ColorConstants.black);

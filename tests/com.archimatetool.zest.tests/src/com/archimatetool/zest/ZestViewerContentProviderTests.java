@@ -22,7 +22,11 @@ import com.archimatetool.model.viewpoints.IViewpoint;
 import com.archimatetool.model.viewpoints.ViewpointManager;
 import com.archimatetool.testingtools.ArchimateTestModel;
 import com.archimatetool.tests.TestData;
-
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.AfterAll;
 
 @SuppressWarnings("nls")
 public class ZestViewerContentProviderTests {
@@ -153,3 +157,4 @@ public class ZestViewerContentProviderTests {
     }
     
 }
+

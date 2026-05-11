@@ -64,6 +64,7 @@ import com.archimatetool.model.IArchimatePackage;
 import com.archimatetool.model.util.ArchimateModelUtils;
 import com.archimatetool.model.viewpoints.IViewpoint;
 import com.archimatetool.model.viewpoints.ViewpointManager;
+import com.archimatetool.model.IDiagramModel;
 
 
 
@@ -172,6 +173,7 @@ implements IZestView, ISelectionListener {
         ISelection selection = getSite().getWorkbenchWindow().getSelectionService().getSelection();
         selectionChanged(null, selection);
     }
+
     
     @Override
     public void selectionChanged(IWorkbenchPart part, ISelection selection) {
@@ -195,8 +197,14 @@ implements IZestView, ISelectionListener {
     }
     
     private void setElement(Object object) {
+        if(object instanceof IDiagramModel diagramModel) {
+            fGraphViewer.setInput(diagramModel);
+            updateActions();
+            updateLabel();
+            return;
+        }
+
         IArchimateConcept concept = null;
-        
         if(object instanceof IArchimateConcept) {
             concept = (IArchimateConcept)object;
         }
@@ -206,7 +214,6 @@ implements IZestView, ISelectionListener {
         
         fDrillDownManager.setNewInput(concept);
         updateActions();
-        
         updateLabel();
     }
     
@@ -220,7 +227,10 @@ implements IZestView, ISelectionListener {
      * Update local label
      */
     void updateLabel() {
-        String text = ArchiLabelProvider.INSTANCE.getLabel(fDrillDownManager.getCurrentConcept());
+    	Object input = fGraphViewer.getInput();
+        Object labelSource = (input instanceof IDiagramModel) ? input : fDrillDownManager.getCurrentConcept();
+
+        String text = ArchiLabelProvider.INSTANCE.getLabel(labelSource);
         text = StringUtils.escapeAmpersandsInText(text);
         
         // Viewpoint
@@ -256,7 +266,8 @@ implements IZestView, ISelectionListener {
         
         fLabel.setText(text + " (" + Messages.ZestView_5 + ": " + viewPointName + ", " + //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$
                     Messages.ZestView_9 + ": " + elements + ", " + Messages.ZestView_6 + ": " + relations + ")"); //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$ //$NON-NLS-4$
-        fLabel.setImage(ArchiLabelProvider.INSTANCE.getImage(fDrillDownManager.getCurrentConcept()));
+        fLabel.setImage(ArchiLabelProvider.INSTANCE.getImage(labelSource));
+
     }
 
     /**
@@ -936,6 +947,10 @@ implements IZestView, ISelectionListener {
     
     @Override
     protected IArchimateModel getActiveArchimateModel() {
+        Object input = fGraphViewer.getInput();
+        if(input instanceof IDiagramModel diagramModel) {
+            return diagramModel.getArchimateModel();
+        }
         IArchimateConcept concept = fDrillDownManager.getCurrentConcept();
         return concept != null ? concept.getArchimateModel() : null;
     }
