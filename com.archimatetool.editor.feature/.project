@@ -1,17 +1,42 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <projectDescription>
-	<name>com.archimatetool.editor.feature</name>
-	<comment></comment>
-	<projects>
-	</projects>
-	<buildSpec>
-		<buildCommand>
-			<name>org.eclipse.pde.FeatureBuilder</name>
-			<arguments>
-			</arguments>
-		</buildCommand>
-	</buildSpec>
-	<natures>
-		<nature>org.eclipse.pde.FeatureNature</nature>
-	</natures>
+  <name>com.archimatetool.editor.feature</name>
+  <comment>NO_M2ECLIPSE_SUPPORT: Project files created with the maven-eclipse-plugin are not supported in M2Eclipse.</comment>
+  <projects>
+    <project>org.opengroup.archimate.xmlexchange</project>
+    <project>com.archimatetool.editor</project>
+    <project>org.eclipse.gef</project>
+    <project>org.eclipse.draw2d</project>
+    <project>com.archimatetool.jdom</project>
+    <project>com.archimatetool.model</project>
+    <project>com.archimatetool.widgets</project>
+    <project>com.archimatetool.commandline</project>
+    <project>com.archimatetool.modelimporter.commandline</project>
+    <project>com.archimatetool.modelimporter</project>
+    <project>com.archimatetool.jasperreports.commandline</project>
+    <project>com.archimatetool.jasperreports</project>
+    <project>com.archimatetool.export.svg</project>
+    <project>com.archimatetool.reports.commandline</project>
+    <project>com.archimatetool.reports</project>
+    <project>com.archimatetool.editor.browser</project>
+    <project>com.archimatetool.canvas</project>
+    <project>com.archimatetool.templates</project>
+    <project>com.archimatetool.help</project>
+    <project>org.opengroup.archimate.xmlexchange.commandline</project>
+    <project>com.archimatetool.zest</project>
+    <project>org.eclipse.zest.core</project>
+    <project>org.eclipse.zest.layouts</project>
+    <project>com.archimatetool.csv.commandline</project>
+    <project>com.archimatetool.csv</project>
+    <project>com.archimatetool.editor.themes</project>
+    <project>com.archimatetool.hammer</project>
+  </projects>
+  <buildSpec>
+    <buildCommand>
+      <name>org.eclipse.pde.FeatureBuilder</name>
+    </buildCommand>
+  </buildSpec>
+  <natures>
+    <nature>org.eclipse.pde.FeatureNature</nature>
+  </natures>
 </projectDescription>

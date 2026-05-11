@@ -1,7 +1,17 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <classpath>
-	<classpathentry kind="src" path="src"/>
-	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER"/>
-	<classpathentry kind="con" path="org.eclipse.pde.core.requiredPlugins"/>
-	<classpathentry kind="output" path="bin"/>
+  <classpathentry kind="src" path="src" including="**/*.java"/>
+  <classpathentry kind="output" path="target/classes"/>
+  <classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER"/>
+  <classpathentry kind="src" path="/org.opengroup.archimate.xmlexchange"/>
+  <classpathentry kind="src" path="/com.archimatetool.editor"/>
+  <classpathentry kind="src" path="/org.eclipse.gef"/>
+  <classpathentry kind="src" path="/org.eclipse.draw2d"/>
+  <classpathentry kind="src" path="/com.archimatetool.jdom"/>
+  <classpathentry kind="src" path="/com.archimatetool.model"/>
+  <classpathentry kind="src" path="/com.archimatetool.widgets"/>
+  <classpathentry kind="src" path="/com.archimatetool.testsupport"/>
+  <classpathentry kind="src" path="/com.archimatetool.canvas"/>
+  <classpathentry kind="src" path="/com.archimatetool.templates"/>
+  <classpathentry kind="src" path="/com.archimatetool.editor.tests"/>
 </classpath>

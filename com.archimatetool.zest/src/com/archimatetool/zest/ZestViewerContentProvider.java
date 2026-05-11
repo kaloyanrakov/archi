@@ -20,7 +20,8 @@ import com.archimatetool.model.IDiagramModel;
 import com.archimatetool.model.util.ArchimateModelUtils;
 import com.archimatetool.model.viewpoints.IViewpoint;
 import com.archimatetool.model.viewpoints.ViewpointManager;
-
+import com.archimatetool.editor.propertysections.IterationPropertyDecorator;
+import com.archimatetool.editor.propertysections.IterationPropertyDecorator.IterationConnection;
 
 /**
  * Graph Viewer Content Provider
@@ -133,6 +134,7 @@ public class ZestViewerContentProvider implements IGraphContentProvider {
         if(inputElement instanceof IArchimateConcept) {
             IArchimateConcept archimateConcept = (IArchimateConcept)inputElement;
             
+            
             // Check if it was deleted
             if(archimateConcept.eContainer() == null) {
                 return new Object[0];
@@ -179,7 +181,7 @@ public class ZestViewerContentProvider implements IGraphContentProvider {
         if(prevIterProp != null && prevIterProp.getValue() != null && !prevIterProp.getValue().isEmpty()) {
             IDiagramModel previousDiagram = findDiagramByName(diagram, prevIterProp.getValue());
             if(previousDiagram != null && !checkList.contains(previousDiagram)) {
-                mainList.add(new IterationRelationship(previousDiagram, diagram));
+            	mainList.add(new IterationConnection(previousDiagram, diagram, IterationPropertyDecorator.PROPERTY_PREVIOUS_ITERATION));
                 getIterationRelations(mainList, checkList, previousDiagram, count);
             }
         }
@@ -193,7 +195,7 @@ public class ZestViewerContentProvider implements IGraphContentProvider {
         if(nextIterProp != null && nextIterProp.getValue() != null && !nextIterProp.getValue().isEmpty()) {
             IDiagramModel nextDiagram = findDiagramByName(diagram, nextIterProp.getValue());
             if(nextDiagram != null && !checkList.contains(nextDiagram)) {
-                mainList.add(new IterationRelationship(diagram, nextDiagram));
+            	mainList.add(new IterationConnection(diagram, nextDiagram, IterationPropertyDecorator.PROPERTY_NEXT_ITERATION));
                 getIterationRelations(mainList, checkList, nextDiagram, count);
             }
         }
@@ -252,8 +254,8 @@ public class ZestViewerContentProvider implements IGraphContentProvider {
         if(rel instanceof IArchimateRelationship) {
             return ((IArchimateRelationship)rel).getSource();
         }
-        if(rel instanceof IterationRelationship) {
-            return ((IterationRelationship)rel).getSource();
+        if(rel instanceof IterationConnection ic) {
+            return ic.getSource();
         }
         return null;
     }
@@ -263,8 +265,8 @@ public class ZestViewerContentProvider implements IGraphContentProvider {
         if(rel instanceof IArchimateRelationship) {
             return ((IArchimateRelationship)rel).getTarget();
         }
-        if(rel instanceof IterationRelationship) {
-            return ((IterationRelationship)rel).getTarget();
+        if(rel instanceof IterationConnection ic) {
+            return ic.getTarget();
         }
         return null;
     }

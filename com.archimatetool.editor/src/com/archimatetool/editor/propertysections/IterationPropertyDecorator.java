@@ -213,4 +213,45 @@ public class IterationPropertyDecorator implements IPropertyDecorator {
             }
         }
     }
+    public static IDiagramModel resolveIterationTarget(IDiagramModel sourceDiagram, String targetName) {
+        if(sourceDiagram == null || sourceDiagram.getArchimateModel() == null || targetName == null || targetName.isBlank()) {
+            return null;
+        }
+        return sourceDiagram.getArchimateModel().getDiagramModels().stream()
+            .filter(d -> !d.equals(sourceDiagram) && targetName.equals(d.getName()))
+            .findFirst()
+            .orElse(null);
+    }
+
+    
+    public static java.util.Map<String, IDiagramModel> getIterationLinks(IDiagramModel diagram) {
+        java.util.Map<String, IDiagramModel> links = new java.util.LinkedHashMap<>();
+        for(com.archimatetool.model.IProperty p : diagram.getProperties()) {
+            if(PROPERTY_NEXT_ITERATION.equals(p.getKey()) || PROPERTY_PREVIOUS_ITERATION.equals(p.getKey())) {
+                links.put(p.getKey(), resolveIterationTarget(diagram, p.getValue()));
+            }
+        }
+        return links;
+    }
+    
+    public static class IterationConnection {
+        private final IDiagramModel source;
+        private final IDiagramModel target;
+        private final String type;
+
+        public IterationConnection(IDiagramModel source, IDiagramModel target, String type) {
+            this.source = source;
+            this.target = target;
+            this.type = type;
+        }
+
+        public IDiagramModel getSource() { return source; }
+        public IDiagramModel getTarget() { return target; }
+        public String getType()          { return type; }
+
+        @Override
+        public String toString() {
+            return source.getName() + " --[" + type + "]--> " + target.getName();
+        }
+    }
 }
