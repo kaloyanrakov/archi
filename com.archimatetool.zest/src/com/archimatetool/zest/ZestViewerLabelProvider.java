@@ -50,7 +50,9 @@ import com.archimatetool.model.ITriggeringRelationship;
 import org.eclipse.draw2d.PolygonDecoration;
 import com.archimatetool.model.IDiagramModel;
 import com.archimatetool.editor.propertysections.IterationPropertyDecorator.IterationConnection;
-
+import org.eclipse.draw2d.Label;
+import org.eclipse.draw2d.MidpointLocator;
+import org.eclipse.draw2d.geometry.Point;
 /**
  * Label Provider
  * 
@@ -186,15 +188,21 @@ implements IBaseLabelProvider, ISelfStyleProvider {
     @Override
     public void selfStyleConnection(Object element, GraphConnection connection) {
     	if(element instanceof IterationConnection ic) {
-            connection.setLineColor(ColorConstants.darkBlue);
-            connection.setLineWidth(2);
-            connection.setText(ic.getType()); // shows "Next Iteration" / "Previous Iteration"
-            connection.setTooltip(null);
-            PolylineConnection conn = (PolylineConnection)connection.getConnectionFigure();
-            conn.setTargetDecoration(new PolygonDecoration()); // filled arrowhead
-            conn.setAntialias(SWT.ON);
-            return;
-        }
+    	    connection.setLineColor(ColorConstants.darkBlue);
+    	    connection.setLineWidth(2);
+    	    connection.setTooltip(null);
+    	    PolylineConnection conn = (PolylineConnection)connection.getConnectionFigure();
+    	    Label label = new Label(ic.getType());
+    	    conn.add(label, new MidpointLocator(conn, 0) {
+    	        @Override
+    	        protected Point getReferencePoint() {
+    	            return super.getReferencePoint().translate(0, -14);
+    	        }
+    	    });
+    	    conn.setTargetDecoration(new PolygonDecoration());
+    	    conn.setAntialias(SWT.ON);
+    	    return;
+    	}
     	
         connection.setLineWidth(0);
         connection.setTooltip(getTooltip(element));

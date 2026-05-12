@@ -65,9 +65,18 @@ import com.archimatetool.model.util.ArchimateModelUtils;
 import com.archimatetool.model.viewpoints.IViewpoint;
 import com.archimatetool.model.viewpoints.ViewpointManager;
 import com.archimatetool.model.IDiagramModel;
-
-
-
+import org.eclipse.zest.layouts.algorithms.SpringLayoutAlgorithm;
+import org.eclipse.zest.layouts.algorithms.HorizontalTreeLayoutAlgorithm;
+import java.util.LinkedList;
+import java.util.HashSet;
+import java.util.LinkedList;
+import java.util.Set;
+import com.archimatetool.model.IDiagramModel;
+import java.util.Set;
+import java.util.LinkedList;
+import org.eclipse.swt.widgets.Display;
+import org.eclipse.zest.core.widgets.GraphNode;
+import com.archimatetool.model.IDiagramModel;
 /**
  * Zest View
  * 
@@ -191,6 +200,49 @@ implements IZestView, ISelectionListener {
         }
     }
     
+    private LinkedList<IDiagramModel> buildIterationChain(IDiagramModel current) {
+        LinkedList<IDiagramModel> chain = new LinkedList<>();
+        chain.add(current);
+        Set<IDiagramModel> visited = new HashSet<>();
+        visited.add(current);
+
+        // Walk backwards (Previous Iteration) → prepend to chain
+        IDiagramModel cursor = current;
+        while(true) {
+            IDiagramModel prev = getLinkedDiagram(cursor, "Previous Iteration"); //$NON-NLS-1$
+            if(prev == null || visited.contains(prev)) break;
+            chain.addFirst(prev);
+            visited.add(prev);
+            cursor = prev;
+        }
+
+        // Walk forwards (Next Iteration) → append to chain
+        cursor = current;
+        while(true) {
+            IDiagramModel next = getLinkedDiagram(cursor, "Next Iteration"); //$NON-NLS-1$
+            if(next == null || visited.contains(next)) break;
+            chain.addLast(next);
+            visited.add(next);
+            cursor = next;
+        }
+
+        return chain;
+    }
+
+    /**
+     * Resolve a Previous/Next Iteration property value to its IDiagramModel.
+     */
+    private IDiagramModel getLinkedDiagram(IDiagramModel diagram, String propertyKey) {
+        return diagram.getProperties().stream()
+            .filter(p -> propertyKey.equals(p.getKey()) && p.getValue() != null && !p.getValue().isEmpty())
+            .findFirst()
+            .map(p -> diagram.getArchimateModel().getDiagramModels().stream()
+                    .filter(d -> p.getValue().equals(d.getName()))
+                    .findFirst()
+                    .orElse(null))
+            .orElse(null);
+    }
+    
     @Override
     protected void selectAll() {
         fGraphViewer.getGraphControl().selectAll();
@@ -198,7 +250,11 @@ implements IZestView, ISelectionListener {
     
     private void setElement(Object object) {
         if(object instanceof IDiagramModel diagramModel) {
+            LinkedList<IDiagramModel> chain = buildIterationChain(diagramModel);
+            // setInput without doApplyLayout — applyLayout() in ZestGraphViewer
+            // is already a no-op, so nodes stay where we put them in asyncExec
             fGraphViewer.setInput(diagramModel);
+            Display.getCurrent().asyncExec(() -> positionIterationNodes(chain));
             updateActions();
             updateLabel();
             return;
@@ -211,10 +267,37 @@ implements IZestView, ISelectionListener {
         else if(object instanceof IAdaptable) {
             concept = ((IAdaptable)object).getAdapter(IArchimateConcept.class);
         }
-        
+
+        fGraphViewer.setLayoutAlgorithm(new SpringLayoutAlgorithm(LayoutStyles.NO_LAYOUT_NODE_RESIZING), false);
         fDrillDownManager.setNewInput(concept);
         updateActions();
         updateLabel();
+    }
+    
+    private void positionIterationNodes(LinkedList<IDiagramModel> chain) {
+        if(fGraphViewer.getGraphControl().isDisposed()) {
+            return;
+        }
+
+        final int NODE_WIDTH = 120;
+        final int H_SPACING  = 200;
+
+        org.eclipse.swt.graphics.Rectangle bounds = fGraphViewer.getGraphControl().getBounds();
+        int count      = chain.size();
+        int totalWidth = count * NODE_WIDTH + (count - 1) * H_SPACING;
+        int startX     = Math.max(20, (bounds.width  - totalWidth) / 2);
+        int centerY    = Math.max(20, (bounds.height - 40) / 2);
+
+        for(Object obj : fGraphViewer.getGraphControl().getNodes()) {
+            GraphNode node = (GraphNode) obj;
+            Object data = node.getData();
+            for(int i = 0; i < chain.size(); i++) {
+                if(chain.get(i).equals(data)) {
+                    node.setLocation(startX + i * (NODE_WIDTH + H_SPACING), centerY);
+                    break;
+                }
+            }
+        }
     }
     
     void refresh() {
