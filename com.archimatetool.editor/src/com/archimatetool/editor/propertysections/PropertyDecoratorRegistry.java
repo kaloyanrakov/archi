@@ -10,14 +10,13 @@ public class PropertyDecoratorRegistry {
     private static final List<IPropertyDecorator> decorators = new ArrayList<>();
 
     static {
-        // Leveling decorator
         decorators.add(new LevelingPropertyDecorator());
-        
-        // Iteration decorators (for diagram views)
         decorators.add(new IterationPropertyDecorator(IterationPropertyDecorator.PROPERTY_PREVIOUS_ITERATION));
         decorators.add(new IterationPropertyDecorator(IterationPropertyDecorator.PROPERTY_NEXT_ITERATION));
+        decorators.add(new IterationPropertyDecorator(IterationPropertyDecorator.PROPERTY_PREVIOUS_VERSION));
+        decorators.add(new IterationPropertyDecorator(IterationPropertyDecorator.PROPERTY_NEXT_VERSION));
+        
     }
-
     public static IPropertyDecorator getDecorator(String propertyKey) {
         return decorators.stream()
             .filter(d -> d.getPropertyKey().equals(propertyKey))

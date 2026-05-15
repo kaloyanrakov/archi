@@ -228,6 +228,35 @@ implements IZestView, ISelectionListener {
 
         return chain;
     }
+    
+    private LinkedList<IDiagramModel> buildVersionChain(IDiagramModel current) {
+        LinkedList<IDiagramModel> chain = new LinkedList<>();
+        chain.add(current);
+        Set<IDiagramModel> visited = new HashSet<>();
+        visited.add(current);
+
+        // Walk backwards (Previous Version) → prepend (goes UP)
+        IDiagramModel cursor = current;
+        while(true) {
+            IDiagramModel prev = getLinkedDiagram(cursor, "Previous Version"); //$NON-NLS-1$
+            if(prev == null || visited.contains(prev)) break;
+            chain.addFirst(prev);
+            visited.add(prev);
+            cursor = prev;
+        }
+
+        // Walk forwards (Next Version) → append (goes DOWN)
+        cursor = current;
+        while(true) {
+            IDiagramModel next = getLinkedDiagram(cursor, "Next Version"); //$NON-NLS-1$
+            if(next == null || visited.contains(next)) break;
+            chain.addLast(next);
+            visited.add(next);
+            cursor = next;
+        }
+
+        return chain;
+    }
 
     /**
      * Resolve a Previous/Next Iteration property value to its IDiagramModel.
@@ -250,11 +279,10 @@ implements IZestView, ISelectionListener {
     
     private void setElement(Object object) {
         if(object instanceof IDiagramModel diagramModel) {
-            LinkedList<IDiagramModel> chain = buildIterationChain(diagramModel);
-            // setInput without doApplyLayout — applyLayout() in ZestGraphViewer
-            // is already a no-op, so nodes stay where we put them in asyncExec
-            fGraphViewer.setInput(diagramModel);
-            Display.getCurrent().asyncExec(() -> positionIterationNodes(chain));
+        	LinkedList<IDiagramModel> iterChain    = buildIterationChain(diagramModel);
+        	LinkedList<IDiagramModel> versionChain = buildVersionChain(diagramModel);
+        	fGraphViewer.setInput(diagramModel);
+        	Display.getCurrent().asyncExec(() -> positionNodes(iterChain, versionChain));
             updateActions();
             updateLabel();
             return;
@@ -274,28 +302,54 @@ implements IZestView, ISelectionListener {
         updateLabel();
     }
     
-    private void positionIterationNodes(LinkedList<IDiagramModel> chain) {
-        if(fGraphViewer.getGraphControl().isDisposed()) {
-            return;
-        }
+    private void positionNodes(LinkedList<IDiagramModel> iterChain, LinkedList<IDiagramModel> versionChain) {
+        if(fGraphViewer.getGraphControl().isDisposed()) return;
 
         final int NODE_WIDTH = 120;
-        final int H_SPACING  = 200;
+        final int NODE_HEIGHT = 40;
+        final int H_SPACING   = 200;
+        final int V_SPACING   = 100;
 
         org.eclipse.swt.graphics.Rectangle bounds = fGraphViewer.getGraphControl().getBounds();
-        int count      = chain.size();
-        int totalWidth = count * NODE_WIDTH + (count - 1) * H_SPACING;
+
+        // --- Horizontal: iteration chain ---
+        int iterCount  = iterChain.size();
+        int totalWidth = iterCount * NODE_WIDTH + (iterCount - 1) * H_SPACING;
         int startX     = Math.max(20, (bounds.width  - totalWidth) / 2);
         int centerY    = Math.max(20, (bounds.height - 40) / 2);
 
+        java.util.Map<IDiagramModel, int[]> positions = new java.util.HashMap<>();
+        for(int i = 0; i < iterChain.size(); i++) {
+            positions.put(iterChain.get(i), new int[]{ startX + i * (NODE_WIDTH + H_SPACING), centerY });
+        }
+
+        // --- Vertical: version chain ---
+        // Find the anchor = the diagram that appears in both chains
+        IDiagramModel anchor = null;
+        for(IDiagramModel dm : iterChain) {
+            if(versionChain.contains(dm)) { anchor = dm; break; }
+        }
+
+        if(anchor != null && versionChain.size() > 1) {
+            int[] anchorPos       = positions.get(anchor);
+            int   anchorX         = anchorPos != null ? anchorPos[0] : (bounds.width / 2);
+            int   anchorIdxV      = versionChain.indexOf(anchor);
+            int   startY          = Math.max(20, centerY - anchorIdxV * (NODE_HEIGHT + V_SPACING));
+
+            for(int i = 0; i < versionChain.size(); i++) {
+                IDiagramModel dm = versionChain.get(i);
+                if(!positions.containsKey(dm)) { // don't overwrite the anchor
+                    positions.put(dm, new int[]{ anchorX, startY + i * (NODE_HEIGHT + V_SPACING) });
+                }
+            }
+        }
+
+        // --- Apply positions to graph nodes ---
         for(Object obj : fGraphViewer.getGraphControl().getNodes()) {
             GraphNode node = (GraphNode) obj;
-            Object data = node.getData();
-            for(int i = 0; i < chain.size(); i++) {
-                if(chain.get(i).equals(data)) {
-                    node.setLocation(startX + i * (NODE_WIDTH + H_SPACING), centerY);
-                    break;
-                }
+            if(node.getData() instanceof IDiagramModel dm && positions.containsKey(dm)) {
+                int[] pos = positions.get(dm);
+                node.setLocation(pos[0], pos[1]);
             }
         }
     }
@@ -556,9 +610,10 @@ implements IZestView, ISelectionListener {
                 Object input = fGraphViewer.getInput();
                 if(input instanceof IDiagramModel diagramModel) {
                     // Rebuild the chain respecting the new depth, reposition without doApplyLayout
-                    LinkedList<IDiagramModel> chain = buildIterationChain(diagramModel);
-                    fGraphViewer.setInput(diagramModel);
-                    Display.getCurrent().asyncExec(() -> positionIterationNodes(chain));
+                	LinkedList<IDiagramModel> iterChain    = buildIterationChain(diagramModel);
+                	LinkedList<IDiagramModel> versionChain = buildVersionChain(diagramModel);
+                	fGraphViewer.setInput(diagramModel);
+                	Display.getCurrent().asyncExec(() -> positionNodes(iterChain, versionChain));
                 }
                 else {
                     fGraphViewer.setInput(input);
@@ -1116,9 +1171,10 @@ implements IZestView, ISelectionListener {
             // If viewing an iteration chain, rebuild and reposition after refresh
             Object input = fGraphViewer.getInput();
             if(input instanceof IDiagramModel diagramModel) {
-                LinkedList<IDiagramModel> chain = buildIterationChain(diagramModel);
-                fGraphViewer.setInput(diagramModel);
-                Display.getCurrent().asyncExec(() -> positionIterationNodes(chain));
+            	LinkedList<IDiagramModel> iterChain    = buildIterationChain(diagramModel);
+            	LinkedList<IDiagramModel> versionChain = buildVersionChain(diagramModel);
+            	fGraphViewer.setInput(diagramModel);
+            	Display.getCurrent().asyncExec(() -> positionNodes(iterChain, versionChain));
             }
             else {
                 refresh();

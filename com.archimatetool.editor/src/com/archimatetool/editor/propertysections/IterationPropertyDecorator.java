@@ -82,37 +82,22 @@ public class IterationPropertyDecorator implements IPropertyDecorator {
     }
 
     private void validateIterationReferences(IDiagramModel diagram, String newValue, CompoundCommand cmd) {
-       
         
         if(newValue == null || newValue.isEmpty()) {
-            
-            // If clearing the property, also clear the reciprocal relationship
+            // Clear reciprocal for iterations
             if(PROPERTY_NEXT_ITERATION.equals(propertyKey)) {
                 IDiagramModel nextDiagram = getReferencedDiagram(diagram, propertyKey);
-                
                 if(nextDiagram != null) {
                     cmd.add(new SetPropertyCommand(nextDiagram, PROPERTY_PREVIOUS_ITERATION, ""));
                 }
             }
             else if(PROPERTY_PREVIOUS_ITERATION.equals(propertyKey)) {
                 IDiagramModel prevDiagram = getReferencedDiagram(diagram, propertyKey);
-               
                 if(prevDiagram != null) {
                     cmd.add(new SetPropertyCommand(prevDiagram, PROPERTY_NEXT_ITERATION, ""));
                 }
             }
-            else if(PROPERTY_NEXT_VERSION.equals(propertyKey)) {
-                IDiagramModel nextDiagram = getReferencedDiagram(diagram, propertyKey);
-                if(nextDiagram != null) {
-                    cmd.add(new SetPropertyCommand(nextDiagram, PROPERTY_PREVIOUS_VERSION, ""));
-                }
-            }
-            else if(PROPERTY_PREVIOUS_VERSION.equals(propertyKey)) {
-                IDiagramModel prevDiagram = getReferencedDiagram(diagram, propertyKey);
-                if(prevDiagram != null) {
-                    cmd.add(new SetPropertyCommand(prevDiagram, PROPERTY_NEXT_VERSION, ""));
-                }
-            }
+            // Clear reciprocal for versions
             else if(PROPERTY_NEXT_VERSION.equals(propertyKey)) {
                 IDiagramModel nextDiagram = getReferencedDiagram(diagram, propertyKey);
                 if(nextDiagram != null) {
@@ -129,21 +114,23 @@ public class IterationPropertyDecorator implements IPropertyDecorator {
         }
 
         IDiagramModel referenced = findDiagramByName(diagram, newValue);
-        if(referenced == null) {
-            return;
-        }
+        if(referenced == null) return;
 
-        // Prevent circular references
+        // Set reciprocal for iterations
         if(PROPERTY_PREVIOUS_ITERATION.equals(propertyKey)) {
             validateNoPreviousCircularReference(diagram, referenced);
-            // Set the reciprocal: referenced's next should point to diagram
             cmd.add(new SetPropertyCommand(referenced, PROPERTY_NEXT_ITERATION, diagram.getName()));
         }
         else if(PROPERTY_NEXT_ITERATION.equals(propertyKey)) {
-            
             validateNoNextCircularReference(diagram, referenced);
-            // Set the reciprocal: referenced's previous should point to diagram
             cmd.add(new SetPropertyCommand(referenced, PROPERTY_PREVIOUS_ITERATION, diagram.getName()));
+        }
+        // Set reciprocal for versions
+        else if(PROPERTY_PREVIOUS_VERSION.equals(propertyKey)) {
+            cmd.add(new SetPropertyCommand(referenced, PROPERTY_NEXT_VERSION, diagram.getName()));
+        }
+        else if(PROPERTY_NEXT_VERSION.equals(propertyKey)) {
+            cmd.add(new SetPropertyCommand(referenced, PROPERTY_PREVIOUS_VERSION, diagram.getName()));
         }
     }
 
