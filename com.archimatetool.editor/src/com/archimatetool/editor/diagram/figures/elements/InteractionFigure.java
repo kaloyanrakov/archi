@@ -7,6 +7,7 @@ package com.archimatetool.editor.diagram.figures.elements;
 
 import org.eclipse.draw2d.ConnectionAnchor;
 import org.eclipse.draw2d.Graphics;
+import org.eclipse.draw2d.RoundedRectangleAnchor;
 import org.eclipse.draw2d.geometry.Point;
 import org.eclipse.draw2d.geometry.Rectangle;
 import org.eclipse.swt.SWT;
@@ -14,7 +15,6 @@ import org.eclipse.swt.graphics.Color;
 import org.eclipse.swt.graphics.Path;
 import org.eclipse.swt.graphics.Pattern;
 
-import com.archimatetool.editor.diagram.editparts.RoundedRectangleAnchor;
 import com.archimatetool.editor.diagram.figures.AbstractTextControlContainerFigure;
 import com.archimatetool.editor.diagram.figures.IFigureDelegate;
 import com.archimatetool.editor.diagram.figures.RoundedRectangleFigureDelegate;
@@ -59,10 +59,6 @@ public class InteractionFigure extends AbstractTextControlContainerFigure implem
         Rectangle imageBounds = rect.getCopy();
         
         setFigurePositionFromTextPosition(rect, 1 / 0.86); // Should match 'FRACTION' defined in getFigurePath()
-        
-        if(!isEnabled()) {
-            setDisabledState(graphics);
-        }
         
         graphics.setAlpha(getAlpha());
         graphics.setBackgroundColor(getFillColor());
@@ -186,7 +182,7 @@ public class InteractionFigure extends AbstractTextControlContainerFigure implem
     
     @Override
     public ConnectionAnchor getDefaultConnectionAnchor() {
-        return getDiagramModelArchimateObject().getType() == 0 ? new RoundedRectangleAnchor(this) : super.getDefaultConnectionAnchor();
+        return getFigureDelegate() instanceof RoundedRectangleFigureDelegate rf ? new RoundedRectangleAnchor(this, rf.getArc()) : super.getDefaultConnectionAnchor();
     }
     
     @Override
