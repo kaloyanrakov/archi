@@ -53,6 +53,8 @@ import com.archimatetool.editor.propertysections.IterationPropertyDecorator.Iter
 import org.eclipse.draw2d.Label;
 import org.eclipse.draw2d.MidpointLocator;
 import org.eclipse.draw2d.geometry.Point;
+import com.archimatetool.editor.propertysections.IterationPropertyDecorator;
+import com.archimatetool.editor.propertysections.IterationPropertyDecorator.IterationConnection;
 /**
  * Label Provider
  * 
@@ -187,23 +189,35 @@ implements IBaseLabelProvider, ISelfStyleProvider {
     
     @Override
     public void selfStyleConnection(Object element, GraphConnection connection) {
-    	if(element instanceof IterationConnection ic) {
-    	    connection.setLineColor(ColorConstants.darkBlue);
-    	    connection.setLineWidth(2);
-    	    connection.setTooltip(null);
-    	    PolylineConnection conn = (PolylineConnection)connection.getConnectionFigure();
-    	    Label label = new Label(ic.getType());
-    	    conn.add(label, new MidpointLocator(conn, 0) {
-    	        @Override
-    	        protected Point getReferencePoint() {
-    	            return super.getReferencePoint().translate(0, -14);
-    	        }
-    	    });
-    	    conn.setTargetDecoration(new PolygonDecoration());
-    	    conn.setAntialias(SWT.ON);
-    	    return;
-    	}
-    	
+        if(element instanceof IterationConnection ic) {
+            PolylineConnection conn = (PolylineConnection)connection.getConnectionFigure();
+            
+            connection.setLineWidth(2);
+            connection.setTooltip(null);
+            conn.setTargetDecoration(new PolygonDecoration());
+            conn.setAntialias(SWT.ON);
+            
+            // Style versions differently from iterations
+            if(IterationPropertyDecorator.PROPERTY_NEXT_VERSION.equals(ic.getType())
+                    || IterationPropertyDecorator.PROPERTY_PREVIOUS_VERSION.equals(ic.getType())) {
+                connection.setLineColor(ColorConstants.blue);
+                connection.setLineStyle(SWT.LINE_CUSTOM);
+                conn.setLineDash(new float[] { 8, 4 });
+            }
+            else {
+                connection.setLineColor(ColorConstants.darkBlue);
+            }
+            
+            Label label = new Label(ic.getType());
+            conn.add(label, new MidpointLocator(conn, 0) {
+                @Override
+                protected Point getReferencePoint() {
+                    return super.getReferencePoint().translate(0, -14);
+                }
+            });
+            return;
+        }
+        
         connection.setLineWidth(0);
         connection.setTooltip(getTooltip(element));
         connection.setLineColor(ColorConstants.black);
@@ -245,21 +259,18 @@ implements IBaseLabelProvider, ISelfStyleProvider {
                 case IAccessRelationship.WRITE_ACCESS:
                 default:
                     conn.setSourceDecoration(null);
-                    conn.setTargetDecoration(AccessConnectionFigure.createFigureTargetDecoration()); // arrow at target endpoint
+                    conn.setTargetDecoration(AccessConnectionFigure.createFigureTargetDecoration());
                     break;
-
                 case IAccessRelationship.READ_ACCESS:
-                    conn.setSourceDecoration(AccessConnectionFigure.createFigureTargetDecoration()); // arrow at source endpoint
+                    conn.setSourceDecoration(AccessConnectionFigure.createFigureTargetDecoration());
                     conn.setTargetDecoration(null);
                     break;
-
                 case IAccessRelationship.UNSPECIFIED_ACCESS:
-                    conn.setSourceDecoration(null);  // no arrows
+                    conn.setSourceDecoration(null);
                     conn.setTargetDecoration(null);
                     break;
-
                 case IAccessRelationship.READ_WRITE_ACCESS:
-                    conn.setSourceDecoration(AccessConnectionFigure.createFigureTargetDecoration()); // both arrows
+                    conn.setSourceDecoration(AccessConnectionFigure.createFigureTargetDecoration());
                     conn.setTargetDecoration(AccessConnectionFigure.createFigureTargetDecoration());
                     break;
             }

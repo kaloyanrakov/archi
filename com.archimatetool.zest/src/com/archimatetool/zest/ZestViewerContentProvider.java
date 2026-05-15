@@ -198,6 +198,34 @@ public class ZestViewerContentProvider implements IGraphContentProvider {
                 getIterationRelations(mainList, checkList, nextDiagram, count);
             }
         }
+     //Get previous version
+        com.archimatetool.model.IProperty prevVersionProp = diagram.getProperties().stream()
+            .filter(p -> IterationPropertyDecorator.PROPERTY_PREVIOUS_VERSION.equals(p.getKey()))
+            .findFirst()
+            .orElse(null);
+        
+        if(prevVersionProp != null && prevVersionProp.getValue() != null && !prevVersionProp.getValue().isEmpty()) {
+            IDiagramModel previousVersion = findDiagramByName(diagram, prevVersionProp.getValue());
+            if(previousVersion != null && !checkList.contains(previousVersion)) {
+                mainList.add(new IterationConnection(previousVersion, diagram, IterationPropertyDecorator.PROPERTY_PREVIOUS_VERSION));
+                getIterationRelations(mainList, checkList, previousVersion, count);
+            }
+        }
+        
+        //Get next version
+        com.archimatetool.model.IProperty nextVersionProp = diagram.getProperties().stream()
+            .filter(p -> IterationPropertyDecorator.PROPERTY_NEXT_VERSION.equals(p.getKey()))
+            .findFirst()
+            .orElse(null);
+        
+        if(nextVersionProp != null && nextVersionProp.getValue() != null && !nextVersionProp.getValue().isEmpty()) {
+            IDiagramModel nextVersion = findDiagramByName(diagram, nextVersionProp.getValue());
+            if(nextVersion != null && !checkList.contains(nextVersion)) {
+                mainList.add(new IterationConnection(diagram, nextVersion, IterationPropertyDecorator.PROPERTY_NEXT_VERSION));
+                getIterationRelations(mainList, checkList, nextVersion, count);
+            }
+        }
+        
     }
     
     private IDiagramModel findDiagramByName(IDiagramModel current, String name) {

@@ -13,6 +13,9 @@ public class IterationPropertyDecorator implements IPropertyDecorator {
 
     public static final String PROPERTY_PREVIOUS_ITERATION = "Previous Iteration"; //$NON-NLS-1$
     public static final String PROPERTY_NEXT_ITERATION = "Next Iteration"; //$NON-NLS-1$
+    
+    public static final String PROPERTY_NEXT_VERSION = "Next Version";
+    public static final String PROPERTY_PREVIOUS_VERSION = "Previous Version";
 
     private final String propertyKey;
 
@@ -227,7 +230,10 @@ public class IterationPropertyDecorator implements IPropertyDecorator {
     public static java.util.Map<String, IDiagramModel> getIterationLinks(IDiagramModel diagram) {
         java.util.Map<String, IDiagramModel> links = new java.util.LinkedHashMap<>();
         for(com.archimatetool.model.IProperty p : diagram.getProperties()) {
-            if(PROPERTY_NEXT_ITERATION.equals(p.getKey()) || PROPERTY_PREVIOUS_ITERATION.equals(p.getKey())) {
+            if(PROPERTY_NEXT_ITERATION.equals(p.getKey()) 
+                    || PROPERTY_PREVIOUS_ITERATION.equals(p.getKey())
+                    || PROPERTY_NEXT_VERSION.equals(p.getKey())       
+                    || PROPERTY_PREVIOUS_VERSION.equals(p.getKey())) {
                 links.put(p.getKey(), resolveIterationTarget(diagram, p.getValue()));
             }
         }
