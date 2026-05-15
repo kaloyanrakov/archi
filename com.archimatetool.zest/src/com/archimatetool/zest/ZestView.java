@@ -545,25 +545,29 @@ implements IZestView, ISelectionListener {
     }
 
     private IAction createDepthAction(final int actionId, final int depth) {
-        IAction act = new Action(Messages.ZestView_3 + " " + depth, IAction.AS_RADIO_BUTTON) { //$NON-NLS-1$
-
+        IAction act = new Action(Messages.ZestView_3 + " " + depth, IAction.AS_RADIO_BUTTON) {
             @Override
             public void run() {
                 IStructuredSelection selection = (IStructuredSelection)fGraphViewer.getSelection();
-                // set depth
                 int depth = Integer.valueOf(getId());
                 getContentProvider().setDepth(depth);
-                // store in prefs
                 ArchiZestPlugin.getInstance().getPreferenceStore().setValue(IPreferenceConstants.VISUALISER_DEPTH, depth);
-                // update viewer
-                fGraphViewer.setInput(fGraphViewer.getInput());
-                fGraphViewer.setSelection(selection);
-                fGraphViewer.doApplyLayout();
+
+                Object input = fGraphViewer.getInput();
+                if(input instanceof IDiagramModel diagramModel) {
+                    // Rebuild the chain respecting the new depth, reposition without doApplyLayout
+                    LinkedList<IDiagramModel> chain = buildIterationChain(diagramModel);
+                    fGraphViewer.setInput(diagramModel);
+                    Display.getCurrent().asyncExec(() -> positionIterationNodes(chain));
+                }
+                else {
+                    fGraphViewer.setInput(input);
+                    fGraphViewer.setSelection(selection);
+                    fGraphViewer.doApplyLayout();
+                }
             }
         };
-
         act.setId(Integer.toString(actionId));
-
         return act;
     }
 
@@ -1102,28 +1106,43 @@ implements IZestView, ISelectionListener {
     }
     
     private boolean doRefresh(Notification msg) {
-        // Name change
         if(msg.getFeature() == IArchimatePackage.Literals.NAMEABLE__NAME) {
             getViewer().update(msg.getNotifier(), null);
-            // Update label
             if(msg.getNotifier() == fDrillDownManager.getCurrentConcept()) {
                 updateLabel();
             }
         }
-        // Requires a full refresh
         else if(isRefreshEvent(msg)) {
-            refresh();
+            // If viewing an iteration chain, rebuild and reposition after refresh
+            Object input = fGraphViewer.getInput();
+            if(input instanceof IDiagramModel diagramModel) {
+                LinkedList<IDiagramModel> chain = buildIterationChain(diagramModel);
+                fGraphViewer.setInput(diagramModel);
+                Display.getCurrent().asyncExec(() -> positionIterationNodes(chain));
+            }
+            else {
+                refresh();
+            }
             return true;
         }
-        
         return false;
     }
-    
+
     private boolean isRefreshEvent(Notification msg) {
+        // Existing: concept added/removed
         if(msg.getNewValue() instanceof IArchimateConcept || msg.getOldValue() instanceof IArchimateConcept) {
             return true;
         }
-        
+        // New: a property value changed on a diagram model (e.g. Previous/Next Iteration set)
+        if(msg.getFeature() == IArchimatePackage.Literals.PROPERTY__VALUE
+                && msg.getNotifier() instanceof com.archimatetool.model.IProperty) {
+            return fGraphViewer.getInput() instanceof IDiagramModel;
+        }
+        // New: a property was added/removed on a diagram model
+        if(msg.getFeature() == IArchimatePackage.Literals.PROPERTIES__PROPERTIES
+                && msg.getNotifier() instanceof IDiagramModel) {
+            return true;
+        }
         return false;
     }
     
