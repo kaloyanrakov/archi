@@ -101,6 +101,30 @@ public class IterationPropertyDecorator implements IPropertyDecorator {
                     cmd.add(new SetPropertyCommand(prevDiagram, PROPERTY_NEXT_ITERATION, ""));
                 }
             }
+            else if(PROPERTY_NEXT_VERSION.equals(propertyKey)) {
+                IDiagramModel nextDiagram = getReferencedDiagram(diagram, propertyKey);
+                if(nextDiagram != null) {
+                    cmd.add(new SetPropertyCommand(nextDiagram, PROPERTY_PREVIOUS_VERSION, ""));
+                }
+            }
+            else if(PROPERTY_PREVIOUS_VERSION.equals(propertyKey)) {
+                IDiagramModel prevDiagram = getReferencedDiagram(diagram, propertyKey);
+                if(prevDiagram != null) {
+                    cmd.add(new SetPropertyCommand(prevDiagram, PROPERTY_NEXT_VERSION, ""));
+                }
+            }
+            else if(PROPERTY_NEXT_VERSION.equals(propertyKey)) {
+                IDiagramModel nextDiagram = getReferencedDiagram(diagram, propertyKey);
+                if(nextDiagram != null) {
+                    cmd.add(new SetPropertyCommand(nextDiagram, PROPERTY_PREVIOUS_VERSION, ""));
+                }
+            }
+            else if(PROPERTY_PREVIOUS_VERSION.equals(propertyKey)) {
+                IDiagramModel prevDiagram = getReferencedDiagram(diagram, propertyKey);
+                if(prevDiagram != null) {
+                    cmd.add(new SetPropertyCommand(prevDiagram, PROPERTY_NEXT_VERSION, ""));
+                }
+            }
             return;
         }
 

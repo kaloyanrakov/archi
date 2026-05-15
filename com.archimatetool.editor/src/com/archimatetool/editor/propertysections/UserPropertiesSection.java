@@ -195,7 +195,8 @@ public class UserPropertiesSection extends AbstractECorePropertySection {
     private static boolean isIterationProperty(String key) {
         if(key == null) return false;
         String lower = key.toLowerCase();
-        return lower.equals("previous iteration") || lower.equals("next iteration");
+        return lower.equals("previous iteration") || lower.equals("next iteration") || lower.equals("previous version")
+        || lower.equals("next version");
     }
 
     private String[] getAllViewNamesForModel() {
@@ -229,7 +230,9 @@ public class UserPropertiesSection extends AbstractECorePropertySection {
     private static boolean isReadOnlyProperty(String key) {
         return "Model Level".equals(key)
             || "Previous Iteration".equals(key)
-            || "Next Iteration".equals(key);
+            || "Next Iteration".equals(key)
+        	|| "Previous Version".equals(key)
+        	|| "Next Version".equals(key);
     }
     
     @Override
