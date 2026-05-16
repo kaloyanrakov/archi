@@ -192,11 +192,12 @@ public class UserPropertiesSection extends AbstractECorePropertySection {
         }
     }
     
+    // Returns true for any property key that should show a view-name dropdown
     private static boolean isIterationProperty(String key) {
         if(key == null) return false;
         String lower = key.toLowerCase();
-        return lower.equals("previous iteration") || lower.equals("next iteration") || lower.equals("previous version")
-        || lower.equals("next version");
+        return lower.equals("previous iteration") || lower.equals("next iteration")
+            || lower.equals("previous version") || lower.equals("next version");
     }
 
     private String[] getAllViewNamesForModel() {
@@ -222,17 +223,17 @@ public class UserPropertiesSection extends AbstractECorePropertySection {
     }
     
     private static final String[] MODEL_LEVEL_VALUES = {
-    	    "Level 1",
-    	    "Level 2",
-    	    "Level 3"
-    	};
+            "Level 1",
+            "Level 2",
+            "Level 3"
+        };
     
     private static boolean isReadOnlyProperty(String key) {
         return "Model Level".equals(key)
             || "Previous Iteration".equals(key)
             || "Next Iteration".equals(key)
-        	|| "Previous Version".equals(key)
-        	|| "Next Version".equals(key);
+            || "Previous Version".equals(key)
+            || "Next Version".equals(key);
     }
     
     @Override
@@ -266,30 +267,39 @@ public class UserPropertiesSection extends AbstractECorePropertySection {
         if(fPropertiesElements.isEmpty()) return;
 
         for(IProperties target : fPropertiesElements) {
-            // Must be either an IArchimateElement OR an IDiagramModel
             if(!(target instanceof IArchimateElement) && !(target instanceof IDiagramModel)) {
                 continue;
             }
 
-            boolean added = false;
+            boolean isView = target instanceof IDiagramModel;
+            boolean changed = false;
             ((org.eclipse.emf.ecore.EObject)target).eSetDeliver(false);
             try {
+            	if(isView) {
+            	    boolean removed = target.getProperties().removeIf(p -> "Model Level".equals(p.getKey()));
+            	    if(removed) changed = true;
+            	}
+            	else {
+            	    boolean removed = target.getProperties().removeIf(p -> 
+            	        IterationPropertyDecorator.PROPERTY_PREVIOUS_ITERATION.equals(p.getKey()) ||
+            	        IterationPropertyDecorator.PROPERTY_NEXT_ITERATION.equals(p.getKey()) ||
+            	        IterationPropertyDecorator.PROPERTY_PREVIOUS_VERSION.equals(p.getKey()) ||
+            	        IterationPropertyDecorator.PROPERTY_NEXT_VERSION.equals(p.getKey()));
+            	    if(removed) changed = true;
+            	}
+
+                // ADD missing properties
                 for(IPropertyDecorator decorator : PropertyDecoratorRegistry.getAllDecorators()) {
-                    // Determine which properties apply to this element type
                     boolean shouldAdd = false;
                     
                     if(decorator instanceof IterationPropertyDecorator) {
-                        // Iteration properties only for IDiagramModel (views)
-                        shouldAdd = target instanceof IDiagramModel;
+                        shouldAdd = isView;
                     }
                     else if(decorator instanceof LevelingPropertyDecorator) {
-                        // Leveling property only for IArchimateElement (objects, not views)
-                        shouldAdd = (target instanceof IArchimateElement) && !(target instanceof IDiagramModel);
+                        shouldAdd = !isView;
                     }
                     
-                    if(!shouldAdd) {
-                        continue;
-                    }
+                    if(!shouldAdd) continue;
                     
                     String key = decorator.getPropertyKey();
                     boolean alreadyExists = target.getProperties().stream()
@@ -299,7 +309,7 @@ public class UserPropertiesSection extends AbstractECorePropertySection {
                         newProperty.setKey(key);
                         newProperty.setValue(""); //$NON-NLS-1$
                         target.getProperties().add(newProperty);
-                        added = true;
+                        changed = true;
                     }
                 }
             }
@@ -307,7 +317,7 @@ public class UserPropertiesSection extends AbstractECorePropertySection {
                 ((org.eclipse.emf.ecore.EObject)target).eSetDeliver(true);
             }
 
-            if(added) {
+            if(changed) {
                 fTableViewer.refresh();
             }
         }
@@ -670,13 +680,48 @@ public class UserPropertiesSection extends AbstractECorePropertySection {
 
         @Override
         public Object[] getElements(Object inputElement) {
-            // More than one element selected
             if(isMultiSelection()) {
                 return getCommonProperties().toArray();
             }
 
-            // One element selected
-            return isAlive(getFirstSelectedElement()) ? getFirstSelectedElement().getProperties().toArray() : new Object[0];
+            if(!isAlive(getFirstSelectedElement())) {
+                return new Object[0];
+            }
+
+            List<IProperty> all = new ArrayList<>(getFirstSelectedElement().getProperties());
+            boolean isView = getFirstSelectedElement() instanceof IDiagramModel;
+
+            List<String> managedKeys = new ArrayList<>();
+            for(IPropertyDecorator decorator : PropertyDecoratorRegistry.getAllDecorators()) {
+                // Only include decorator if appropriate for this element type
+                if(decorator instanceof IterationPropertyDecorator && isView) {
+                    managedKeys.add(decorator.getPropertyKey());
+                }
+                else if(decorator instanceof LevelingPropertyDecorator && !isView) {
+                    managedKeys.add(decorator.getPropertyKey());
+                }
+            }
+
+            List<IProperty> managed = new ArrayList<>();
+            List<IProperty> user    = new ArrayList<>();
+
+            for(String key : managedKeys) {
+                all.stream()
+                    .filter(p -> key.equals(p.getKey()))
+                    .findFirst()
+                    .ifPresent(managed::add);
+            }
+
+            for(IProperty p : all) {
+                if(!managedKeys.contains(p.getKey())) {
+                    // Also hide Model Level on views even if it was previously saved
+                    if(isView && "Model Level".equals(p.getKey())) continue;
+                    user.add(p);
+                }
+            }
+
+            managed.addAll(user);
+            return managed.toArray();
         }
     }
 
@@ -783,8 +828,6 @@ public class UserPropertiesSection extends AbstractECorePropertySection {
                 }
             }
             
-            // If multi-selection update the local Property without notifications so we don't refresh the table with fresh contents
-            // and avoid problems with tab traversal
             if(isMultiSelection()) {
                 try {
                     ignoreMessages = true;
@@ -837,6 +880,7 @@ public class UserPropertiesSection extends AbstractECorePropertySection {
             cellEditor.setEditable(!isReadOnlyProperty(property.getKey()));
             return cellEditor;
         }
+
         @Override
         protected boolean canEdit(Object element) {
             return true;
@@ -868,7 +912,7 @@ public class UserPropertiesSection extends AbstractECorePropertySection {
                 }
             }
             
-            // Decorator side effects (folder move, label expression, etc.)
+            // Decorator side effects
             if(element instanceof IProperty p) {
                 IPropertyDecorator decorator = PropertyDecoratorRegistry.getDecorator(p.getKey());
                 if(decorator != null) {
@@ -879,8 +923,6 @@ public class UserPropertiesSection extends AbstractECorePropertySection {
                 }
             }
             
-            // If multi-selection update the local Property without notifications so we don't refresh the table with fresh contents
-            // and avoid problems with tab traversal
             if(isMultiSelection()) {
                 try {
                     ignoreMessages = true;
@@ -904,19 +946,15 @@ public class UserPropertiesSection extends AbstractECorePropertySection {
      */
     private void hookCellEditorGlobalActionHandler(CellEditor cellEditor) {
         Listener listener = new Listener() {
-            // We have to disable the action handlers of the the active Editor/View site *and* the Properties View Site
             GlobalActionDisablementHandler propertiesViewGlobalActionHandler, globalActionHandler;
             
             @Override
             public void handleEvent(Event event) {
                 switch(event.type) {
                     case SWT.Activate:
-                        // The Properties View site action bars
                         IActionBars actionBars = getTabbedPropertySheetPage().getSite().getActionBars();
                         propertiesViewGlobalActionHandler = new GlobalActionDisablementHandler(actionBars);
                         propertiesViewGlobalActionHandler.clearGlobalActions();
-                        
-                        // The active View or Editor site's action bars also have to be updated
                         globalActionHandler = new GlobalActionDisablementHandler();
                         globalActionHandler.update();
                         break;
@@ -946,9 +984,6 @@ public class UserPropertiesSection extends AbstractECorePropertySection {
 
     private boolean fDragSourceValid;
 
-    /*
-     * Drag Source support
-     */
     private void addDragSupport() {
         int operations = DND.DROP_MOVE;
         Transfer[] transferTypes = new Transfer[] { LocalSelectionTransfer.getTransfer() };
@@ -961,9 +996,6 @@ public class UserPropertiesSection extends AbstractECorePropertySection {
 
             @Override
             public void dragSetData(DragSourceEvent event) {
-                // For consistency set the data to the selection even though
-                // the selection is provided by the LocalSelectionTransfer
-                // to the drop target adapter.
                 event.data = LocalSelectionTransfer.getTransfer().getSelection();
             }
 
@@ -1020,13 +1052,12 @@ public class UserPropertiesSection extends AbstractECorePropertySection {
 
             @Override
             public void dropAccept(DropTargetEvent event) {
-                event.detail = getEventDetail(event); // double-check this
+                event.detail = getEventDetail(event);
             }
 
             private int getEventDetail(DropTargetEvent event) {
                 return fDragSourceValid ? DND.DROP_MOVE : DND.DROP_NONE;
             }
-            
         });
     }
 
@@ -1041,10 +1072,8 @@ public class UserPropertiesSection extends AbstractECorePropertySection {
             return;
         }
 
-        // Determine the index position of the drop
         int index = getDropTargetPosition(event);
 
-        // Valid position?
         List<?> list = ((IStructuredSelection)selection).toList();
         for(Object o : list) {
             IProperty property = (IProperty)o;
@@ -1060,7 +1089,6 @@ public class UserPropertiesSection extends AbstractECorePropertySection {
     private void movePropertiesToIndex(List<IProperty> propertiesToMove, int index) {
         EList<IProperty> properties = getFirstSelectedElement().getProperties();
 
-        // Sanity check
         if(index < 0) {
             index = 0;
         }
@@ -1105,7 +1133,6 @@ public class UserPropertiesSection extends AbstractECorePropertySection {
             index = getFirstSelectedElement().getProperties().size();
         }
 
-        // Dropped in after position
         int feedback = getDragFeedbackType(event);
         if(feedback == DND.FEEDBACK_INSERT_AFTER) {
             index += 1;
@@ -1114,9 +1141,6 @@ public class UserPropertiesSection extends AbstractECorePropertySection {
         return index;
     }
 
-    /**
-     * Determine the feedback type for DND
-     */
     private int getDragFeedbackType(DropTargetEvent event) {
         if(event.item == null) {
             return DND.FEEDBACK_NONE;
@@ -1131,7 +1155,7 @@ public class UserPropertiesSection extends AbstractECorePropertySection {
             return DND.FEEDBACK_INSERT_AFTER;
         }
 
-        return DND.FEEDBACK_NONE; // <----- This is important otherwise we get unwanted selection cheese on XP
+        return DND.FEEDBACK_NONE;
     }
 
     // -----------------------------------------------------------------------------------------------------------------
@@ -1140,9 +1164,6 @@ public class UserPropertiesSection extends AbstractECorePropertySection {
     //
     // -----------------------------------------------------------------------------------------------------------------
     
-    /**
-     * New Property Action
-     */
     private class NewPropertyAction extends Action {
         private NewPropertyAction() {
             super(Messages.UserPropertiesSection_2);
@@ -1152,7 +1173,7 @@ public class UserPropertiesSection extends AbstractECorePropertySection {
 
         @Override
         public void run() {
-            fTableViewer.applyEditorValue(); // complete any current editing
+            fTableViewer.applyEditorValue();
             IProperty newProperty = null;
             
             if(isMultiSelection()) {
@@ -1188,9 +1209,6 @@ public class UserPropertiesSection extends AbstractECorePropertySection {
         }
     }
     
-    /**
-     * New Multiple Properties Action
-     */
     private class NewMultiplePropertiesAction extends Action {
         private NewMultiplePropertiesAction() {
             super(Messages.UserPropertiesSection_3);
@@ -1211,7 +1229,6 @@ public class UserPropertiesSection extends AbstractECorePropertySection {
                     CompoundCommand cmd = isMultiSelection() ? new CompoundCommand(Messages.UserPropertiesSection_20) : 
                                                                new EObjectNonNotifyingCompoundCommand(getFirstSelectedElement(), Messages.UserPropertiesSection_20);
                     
-                    // Add properties that are not already present
                     boolean addUnique = dialog.getReturnCode() == IDialogConstants.CLIENT_ID;
                     
                     for(IProperties propertiesElement : fPropertiesElements) {
@@ -1230,9 +1247,6 @@ public class UserPropertiesSection extends AbstractECorePropertySection {
             }
         }
         
-        /**
-         * @return true if propertiesElement already has a property by key
-         */
         private boolean hasPropertyKey(IProperties propertiesElement, String key) {
             for(IProperty property : propertiesElement.getProperties()) {
                 if(key.equals(property.getKey())) {
@@ -1243,9 +1257,6 @@ public class UserPropertiesSection extends AbstractECorePropertySection {
         }
     }
 
-    /**
-     * Remove properties Action
-     */
     private class RemovePropertiesAction extends Action {
         private RemovePropertiesAction() {
             super(Messages.UserPropertiesSection_4);
@@ -1259,13 +1270,13 @@ public class UserPropertiesSection extends AbstractECorePropertySection {
             CompoundCommand cmd = isMultiSelection() ? new CompoundCommand() : new EObjectNonNotifyingCompoundCommand(getFirstSelectedElement());
             
             for(Object o : ((IStructuredSelection)fTableViewer.getSelection()).toList()) {
-                IProperty selectedProperty = (IProperty)o;          // use a separate final-ish variable
+                IProperty selectedProperty = (IProperty)o;
                 if(isReadOnlyProperty(selectedProperty.getKey())) {
                     continue; // skip protected properties
                 }
                 for(IProperties propertiesElement : fPropertiesElements) {
                     if(isAlive(propertiesElement)) {
-                        IProperty property = selectedProperty;      // local copy for this inner scope
+                        IProperty property = selectedProperty;
                         if(isMultiSelection()) {
                             property = getFirstMatchingProperty(propertiesElement.getProperties(), property);
                         }
@@ -1280,9 +1291,6 @@ public class UserPropertiesSection extends AbstractECorePropertySection {
         }
     }
 
-    /**
-     * Manage global keys Action
-     */
     private class ShowKeyEditorAction extends Action {
         private ShowKeyEditorAction() {
             super(Messages.UserPropertiesSection_7);
@@ -1306,9 +1314,6 @@ public class UserPropertiesSection extends AbstractECorePropertySection {
     //
     // -----------------------------------------------------------------------------------------------------------------
 
-    /**
-     * New Property Command
-     */
     private static class NewPropertyCommand extends Command {
         private EList<IProperty> properties;
         private IProperty property;
@@ -1343,9 +1348,6 @@ public class UserPropertiesSection extends AbstractECorePropertySection {
         }
     }
 
-    /**
-     * Remove Property Command
-     */
     private static class RemovePropertyCommand extends Command {
         private EList<IProperty> properties;
         private IProperty property;
@@ -1359,8 +1361,6 @@ public class UserPropertiesSection extends AbstractECorePropertySection {
 
         @Override
         public void execute() {
-            // Ensure index is stored just before execute because if this is part of a composite action
-            // then the index positions will have changed
             index = properties.indexOf(property); 
             if(index != -1) {
                 properties.remove(property);
@@ -1381,9 +1381,6 @@ public class UserPropertiesSection extends AbstractECorePropertySection {
         }
     }
 
-    /**
-     * Move Property Command
-     */
     private static class MovePropertyCommand extends Command {
         private EList<IProperty> properties;
         private IProperty property;
@@ -1415,9 +1412,6 @@ public class UserPropertiesSection extends AbstractECorePropertySection {
         }
     }
 
-    /**
-     * Sort Properties Command
-     */
     private static class SortPropertiesCommand extends Command {
         private EList<IProperty> properties;
         private List<IProperty> original;
@@ -1426,8 +1420,6 @@ public class UserPropertiesSection extends AbstractECorePropertySection {
         public SortPropertiesCommand(EList<IProperty> properties) {
             setLabel(Messages.UserPropertiesSection_14);
             this.properties = properties;
-
-            // Keep a copy of the original order
             original = new ArrayList<IProperty>(properties);
         }
 
