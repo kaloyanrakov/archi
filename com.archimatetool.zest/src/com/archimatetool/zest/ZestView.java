@@ -305,7 +305,7 @@ implements IZestView, ISelectionListener {
         updateLabel();
     }
     
-    private void positionNodes(IDiagramModel selected, LinkedList<IDiagramModel> iterChain, LinkedList<IDiagramModel> versionChain) {
+    private void positionNodes(IDiagramModel selected,LinkedList<IDiagramModel> iterChain, LinkedList<IDiagramModel> versionChain) {
     	if(fGraphViewer.getGraphControl().isDisposed()) return;
 
     	final int NODE_WIDTH  = 120;
@@ -316,74 +316,65 @@ implements IZestView, ISelectionListener {
     	org.eclipse.swt.graphics.Rectangle bounds = fGraphViewer.getGraphControl().getBounds();
     	int centerX = bounds.width  / 2;
     	int centerY = bounds.height / 2;
-	
+
     	java.util.Map<IDiagramModel, int[]> positions = new java.util.HashMap<>();
 
-    	// --- Place selected at center ---
+	// --- BFS from selected, extending the cross in all 4 directions ---
+    	java.util.Queue<IDiagramModel> queue = new java.util.LinkedList<>();
     	positions.put(selected, new int[]{ centerX, centerY });
+    	queue.add(selected);
 
-    	// --- Previous Iteration → walk LEFT ---
-    	IDiagramModel cursor = selected;
-    	int leftStep = 1;
-    	while(true) {
-    		IDiagramModel prev = getLinkedDiagram(cursor, "Previous Iteration"); //$NON-NLS-1$
-    	if(prev == null || positions.containsKey(prev)) break;
-    		positions.put(prev, new int[]{ centerX - leftStep * (NODE_WIDTH + H_SPACING), centerY });
-    		leftStep++;
-    		cursor = prev;
-    	}
+    	while(!queue.isEmpty()) {
+    		IDiagramModel current = queue.poll();
+    		int[] currentPos = positions.get(current);
 
-    	// --- Next Iteration → walk RIGHT ---
-    	cursor = selected;
-    	int rightStep = 1;
-    	while(true) {
-    		IDiagramModel next = getLinkedDiagram(cursor, "Next Iteration"); //$NON-NLS-1$
-    	if(next == null || positions.containsKey(next)) break;
-    		positions.put(next, new int[]{ centerX + rightStep * (NODE_WIDTH + H_SPACING), centerY });
-    		rightStep++;
-    		cursor = next;
-    	}
+    		// Previous Iteration → LEFT
+    		IDiagramModel prevIter = getLinkedDiagram(current, "Previous Iteration"); //$NON-NLS-1$
+    		if(prevIter != null && !positions.containsKey(prevIter)) {
+    			positions.put(prevIter, new int[]{ currentPos[0] - (NODE_WIDTH + H_SPACING), currentPos[1] });
+    			queue.add(prevIter);
+    		}
 
-    	// --- Previous Version → walk UP ---
-    	cursor = selected;
-    	int upStep = 1;
-    	while(true) {
-    		IDiagramModel prev = getLinkedDiagram(cursor, "Previous Version"); //$NON-NLS-1$
-    	if(prev == null || positions.containsKey(prev)) break;
-    		positions.put(prev, new int[]{ centerX, centerY - upStep * (NODE_HEIGHT + V_SPACING) });
-    		upStep++;
-    		cursor = prev;
-    	}
+    		// Next Iteration → RIGHT
+    		IDiagramModel nextIter = getLinkedDiagram(current, "Next Iteration"); //$NON-NLS-1$
+    		if(nextIter != null && !positions.containsKey(nextIter)) {
+    			positions.put(nextIter, new int[]{ currentPos[0] + (NODE_WIDTH + H_SPACING), currentPos[1] });
+    			queue.add(nextIter);
+    		}
 
-    	// --- Next Version → walk DOWN ---
-    	cursor = selected;
-    	int downStep = 1;
-    	while(true) {
-    		IDiagramModel next = getLinkedDiagram(cursor, "Next Version"); //$NON-NLS-1$
-    	if(next == null || positions.containsKey(next)) break;
-    		positions.put(next, new int[]{ centerX, centerY + downStep * (NODE_HEIGHT + V_SPACING) });
-    		downStep++;
-    		cursor = next;
+    		// Previous Version → UP
+    		IDiagramModel prevVer = getLinkedDiagram(current, "Previous Version"); //$NON-NLS-1$
+    		if(prevVer != null && !positions.containsKey(prevVer)) {
+    			positions.put(prevVer, new int[]{ currentPos[0], currentPos[1] - (NODE_HEIGHT + V_SPACING) });
+    			queue.add(prevVer);
+    		}
+
+    		// Next Version → DOWN
+    		IDiagramModel nextVer = getLinkedDiagram(current, "Next Version"); //$NON-NLS-1$
+    		if(nextVer != null && !positions.containsKey(nextVer)) {
+    			positions.put(nextVer, new int[]{ currentPos[0], currentPos[1] + (NODE_HEIGHT + V_SPACING) });
+    			queue.add(nextVer);
+    		}
     	}
 
     	// --- Apply to graph nodes ---
     	for(Object obj : fGraphViewer.getGraphControl().getNodes()) {
     		GraphNode node = (GraphNode) obj;
-    	if(node.getData() instanceof IDiagramModel dm && positions.containsKey(dm)) {
-    		int[] pos = positions.get(dm);
-    		node.setLocation(pos[0], pos[1]);
+    		if(node.getData() instanceof IDiagramModel dm && positions.containsKey(dm)) {
+    			int[] pos = positions.get(dm);
+    			node.setLocation(pos[0], pos[1]);
     		}
     	}
 
-    	// --- Make iteration/version connections straight ---
+    	// --- Make connections straight ---
     	for(Object obj : fGraphViewer.getGraphControl().getConnections()) {
     		org.eclipse.zest.core.widgets.GraphConnection conn =
-    		(org.eclipse.zest.core.widgets.GraphConnection) obj;
-    	if(conn.getData() instanceof IterationConnection) {
-    		conn.setCurveDepth(0);
-    	if(conn.getConnectionFigure() instanceof org.eclipse.draw2d.PolylineConnection pc) {
-    		pc.setConnectionRouter(org.eclipse.draw2d.ConnectionRouter.NULL);
-    		}
+    				(org.eclipse.zest.core.widgets.GraphConnection) obj;
+    		if(conn.getData() instanceof IterationConnection) {
+    			conn.setCurveDepth(0);
+    			if(conn.getConnectionFigure() instanceof org.eclipse.draw2d.PolylineConnection pc) {
+    				pc.setConnectionRouter(org.eclipse.draw2d.ConnectionRouter.NULL);
+    			}
     		}
     	}
     }

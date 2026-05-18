@@ -207,7 +207,7 @@ public class ZestViewerContentProvider implements IGraphContentProvider {
         if(prevVersionProp != null && prevVersionProp.getValue() != null && !prevVersionProp.getValue().isEmpty()) {
             IDiagramModel previousVersion = findDiagramByName(diagram, prevVersionProp.getValue());
             if(previousVersion != null && !checkList.contains(previousVersion)) {
-                mainList.add(new IterationConnection(previousVersion, diagram, IterationPropertyDecorator.PROPERTY_PREVIOUS_VERSION));
+            	mainList.add(new IterationConnection(diagram, previousVersion, IterationPropertyDecorator.PROPERTY_PREVIOUS_VERSION));
                 getIterationRelations(mainList, checkList, previousVersion, count);
             }
         }
