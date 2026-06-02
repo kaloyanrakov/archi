@@ -17,6 +17,8 @@ import com.archimatetool.editor.diagram.actions.DeleteFromModelAction;
 import com.archimatetool.editor.diagram.actions.InvertConnectionAction;
 import com.archimatetool.model.viewpoints.IViewpoint;
 import com.archimatetool.model.viewpoints.ViewpointManager;
+import com.archimatetool.editor.diagram.actions.CompareDiagramViewsAction;
+
 
 
 /**
@@ -64,5 +66,8 @@ public class ArchimateDiagramEditorContextMenuProvider extends AbstractDiagramEd
         for(IViewpoint viewPoint : ViewpointManager.INSTANCE.getAllViewpoints()) {
             viewPointMenu.add(actionRegistry.getAction(viewPoint.toString()));
         }
+     // Compare Views
+        menu.appendToGroup(GROUP_RENAME, new Separator());
+        menu.appendToGroup(GROUP_RENAME, actionRegistry.getAction(CompareDiagramViewsAction.ID));
     }
 }

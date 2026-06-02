@@ -76,8 +76,20 @@ import java.util.Set;
 import java.util.LinkedList;
 import org.eclipse.swt.widgets.Display;
 import org.eclipse.zest.core.widgets.GraphNode;
-import com.archimatetool.model.IDiagramModel;
 import com.archimatetool.editor.propertysections.IterationPropertyDecorator.IterationConnection;
+
+import java.util.List;
+import java.util.Map;
+import com.archimatetool.model.IArchimateElement;
+import com.archimatetool.model.IArchimateFactory;
+import com.archimatetool.model.IArchimateDiagramModel;
+import com.archimatetool.model.IDiagramModelArchimateConnection;
+import com.archimatetool.model.IDiagramModelArchimateObject;
+import com.archimatetool.model.IDiagramModelConnection;
+import com.archimatetool.model.IDiagramModelObject;
+import com.archimatetool.model.IArchimateRelationship;
+import com.archimatetool.model.IFolder;
+import com.archimatetool.editor.propertysections.IterationPropertyDecorator;
 /**
  * Zest View
  * 
@@ -1009,6 +1021,24 @@ implements IZestView, ISelectionListener {
             manager.add(fActionSelectInModelTree);
             manager.add(new Separator());
             manager.add(fActionProperties);
+
+            if(selected instanceof IDiagramModel selectedDm) {
+                Set<IDiagramModel> reachable = IterationPropertyDecorator.getAllReachableViews(selectedDm);
+
+                if(!reachable.isEmpty()) {
+                    IMenuManager compareMenu = new MenuManager("Compare with..."); //$NON-NLS-1$
+                    for(IDiagramModel target : reachable) {
+                        compareMenu.add(new Action(target.getName()) {
+                            @Override
+                            public void run() {
+                                ZestView.this.generateAndOpenDiffView(selectedDm, target);
+                            }
+                        });
+                    }
+                    manager.add(new Separator());
+                    manager.add(compareMenu);
+                }
+            }
         }
 
         // Other plug-ins can contribute their actions here
@@ -1244,5 +1274,129 @@ implements IZestView, ISelectionListener {
     @Override
     public String getSearchExpression(Object target) {
         return Messages.ZestView_2;
+    }
+    private void generateAndOpenDiffView(IDiagramModel baseView, IDiagramModel targetView) {
+        Map<String, IDiagramModelArchimateObject> baseElems   = collectElementsById(baseView);
+        Map<String, IDiagramModelArchimateObject> targetElems = collectElementsById(targetView);
+
+        IArchimateDiagramModel diffDm = IArchimateFactory.eINSTANCE.createArchimateDiagramModel();
+        diffDm.setName("Diff: " + baseView.getName() + " \u2192 " + targetView.getName()); //$NON-NLS-1$
+
+        if(baseView.eContainer() instanceof IFolder folder) {
+            folder.getElements().add(diffDm);
+        }
+
+        final int CELL_W = 160, CELL_H = 100, PADDING = 20, COLS = 5;
+        Map<String, IDiagramModelArchimateObject> diffDmos = new java.util.HashMap<>();
+        int col = 0, row = 0;
+
+        // Removed (in base, not in target) — light red
+        for(Map.Entry<String, IDiagramModelArchimateObject> e : baseElems.entrySet()) {
+            if(!targetElems.containsKey(e.getKey())) {
+                IDiagramModelArchimateObject copy = copyDmo(e.getValue(), PADDING + col * CELL_W, PADDING + row * CELL_H);
+                copy.setFillColor("#FFCCCC"); //$NON-NLS-1$
+                diffDm.getChildren().add(copy);
+                diffDmos.put(e.getKey(), copy);
+                if(++col >= COLS) { col = 0; row++; }
+            }
+        }
+
+        // Unchanged (in both) — keep original fill
+        for(Map.Entry<String, IDiagramModelArchimateObject> e : baseElems.entrySet()) {
+            if(targetElems.containsKey(e.getKey())) {
+                IDiagramModelArchimateObject copy = copyDmo(e.getValue(), PADDING + col * CELL_W, PADDING + row * CELL_H);
+                diffDm.getChildren().add(copy);
+                diffDmos.put(e.getKey(), copy);
+                if(++col >= COLS) { col = 0; row++; }
+            }
+        }
+
+        // Added (in target, not in base) — light green
+        for(Map.Entry<String, IDiagramModelArchimateObject> e : targetElems.entrySet()) {
+            if(!baseElems.containsKey(e.getKey())) {
+                IDiagramModelArchimateObject copy = copyDmo(e.getValue(), PADDING + col * CELL_W, PADDING + row * CELL_H);
+                copy.setFillColor("#CCFFCC"); //$NON-NLS-1$
+                diffDm.getChildren().add(copy);
+                diffDmos.put(e.getKey(), copy);
+                if(++col >= COLS) { col = 0; row++; }
+            }
+        }
+
+        addDiffConnections(baseView,   diffDmos, baseElems,   targetElems, false);
+        addDiffConnections(targetView, diffDmos, targetElems, baseElems,   true);
+
+        com.archimatetool.editor.ui.services.EditorManager.openDiagramEditor(diffDm, false);
+
+    }
+
+    private Map<String, IDiagramModelArchimateObject> collectElementsById(IDiagramModel view) {
+        Map<String, IDiagramModelArchimateObject> map = new java.util.LinkedHashMap<>();
+        for(IDiagramModelObject child : view.getChildren()) {
+            if(child instanceof IDiagramModelArchimateObject dmo) {
+                IArchimateElement el = dmo.getArchimateElement();
+                if(el != null && el.getId() != null) {
+                    map.put(el.getId(), dmo);
+                }
+            }
+        }
+        return map;
+    }
+
+    private IDiagramModelArchimateObject copyDmo(IDiagramModelArchimateObject src, int x, int y) {
+        IDiagramModelArchimateObject copy = IArchimateFactory.eINSTANCE.createDiagramModelArchimateObject();
+        copy.setArchimateElement(src.getArchimateElement());
+        int w = src.getBounds().getWidth()  > 0 ? src.getBounds().getWidth()  : 120;
+        int h = src.getBounds().getHeight() > 0 ? src.getBounds().getHeight() : 55;
+        copy.setBounds(x, y, w, h);
+        copy.setType(src.getType());
+        copy.setTextAlignment(src.getTextAlignment());
+        copy.setTextPosition(src.getTextPosition());
+        copy.setFillColor(src.getFillColor());
+        return copy;
+    }
+
+    private void addDiffConnections(IDiagramModel view,
+            Map<String, IDiagramModelArchimateObject> diffDmos,
+            Map<String, IDiagramModelArchimateObject> ownElems,
+            Map<String, IDiagramModelArchimateObject> otherElems,
+            boolean isTargetSide) {
+
+        for(IDiagramModelObject child : view.getChildren()) {
+            if(!(child instanceof IDiagramModelArchimateObject srcDmo)) continue;
+
+            for(IDiagramModelConnection rawConn : srcDmo.getSourceConnections()) {
+                if(!(rawConn instanceof IDiagramModelArchimateConnection dmac)) continue;
+
+                IArchimateRelationship rel = dmac.getArchimateRelationship();
+                if(rel == null) continue;
+
+                String srcId = rel.getSource() != null ? rel.getSource().getId() : null;
+                String tgtId = rel.getTarget() != null ? rel.getTarget().getId() : null;
+                if(srcId == null || tgtId == null) continue;
+
+                IDiagramModelArchimateObject newSrc = diffDmos.get(srcId);
+                IDiagramModelArchimateObject newTgt = diffDmos.get(tgtId);
+                if(newSrc == null || newTgt == null) continue;
+
+                boolean alreadyAdded = newSrc.getSourceConnections().stream()
+                    .filter(c -> c instanceof IDiagramModelArchimateConnection)
+                    .map(c -> (IDiagramModelArchimateConnection) c)
+                    .anyMatch(c -> rel.getId().equals(
+                        c.getArchimateRelationship() != null ? c.getArchimateRelationship().getId() : null));
+                if(alreadyAdded) continue;
+
+                IDiagramModelArchimateConnection newConn =
+                    IArchimateFactory.eINSTANCE.createDiagramModelArchimateConnection();
+                newConn.setArchimateRelationship(rel);
+
+                boolean srcShared = ownElems.containsKey(srcId) && otherElems.containsKey(srcId);
+                boolean tgtShared = ownElems.containsKey(tgtId) && otherElems.containsKey(tgtId);
+                if(!srcShared || !tgtShared) {
+                    newConn.setLineColor(isTargetSide ? "#33AA33" : "#FF6666"); //$NON-NLS-1$ //$NON-NLS-2$
+                }
+
+                newConn.connect(newSrc, newTgt);
+            }
+        }
     }
 }

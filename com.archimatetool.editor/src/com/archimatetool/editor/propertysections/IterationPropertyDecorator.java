@@ -8,6 +8,7 @@ import com.archimatetool.model.IDiagramModel;
 import com.archimatetool.model.IArchimateFactory;
 import com.archimatetool.model.IProperties;
 import com.archimatetool.model.IProperty;
+import java.util.Set;
 
 public class IterationPropertyDecorator implements IPropertyDecorator {
 
@@ -58,6 +59,7 @@ public class IterationPropertyDecorator implements IPropertyDecorator {
 
         return diagramNames.toArray(new String[0]);
     }
+    
 
     @Override
     public void contributeCommands(IArchimateElement element, String newValue, CompoundCommand cmd) {
@@ -269,6 +271,21 @@ public class IterationPropertyDecorator implements IPropertyDecorator {
         @Override
         public String toString() {
             return source.getName() + " --[" + type + "]--> " + target.getName();
+        }
+    }
+    public static Set<IDiagramModel> getAllReachableViews(IDiagramModel start) {
+        Set<IDiagramModel> visited = new java.util.LinkedHashSet<>();
+        collectReachable(start, visited);
+        visited.remove(start);
+        return visited;
+    }
+
+    private static void collectReachable(IDiagramModel diagram, Set<IDiagramModel> visited) {
+        if(!visited.add(diagram)) return;
+        for(IDiagramModel linked : getIterationLinks(diagram).values()) {
+            if(linked != null) {
+                collectReachable(linked, visited);
+            }
         }
     }
 }

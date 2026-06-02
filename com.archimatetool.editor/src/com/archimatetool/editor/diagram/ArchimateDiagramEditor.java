@@ -35,6 +35,8 @@ import com.archimatetool.model.IArchimatePackage;
 import com.archimatetool.model.IDiagramModelComponent;
 import com.archimatetool.model.viewpoints.IViewpoint;
 import com.archimatetool.model.viewpoints.ViewpointManager;
+import com.archimatetool.editor.diagram.actions.CompareDiagramViewsAction;
+import com.archimatetool.editor.diagram.actions.CompareDiagramViewsAction;
 
 
 
@@ -186,6 +188,11 @@ implements IArchimateDiagramEditor {
         action = new GenerateViewAction(this);
         registry.registerAction(action);
         getSelectionActions().add(action.getId());
+        
+     // Compare Views (Diff)
+        action = new CompareDiagramViewsAction(this);
+        registry.registerAction(action);
+        // Note: NOT added to selectionActions — it's always available on the canvas
     }
     
     @Override
