@@ -243,10 +243,11 @@ public class IterationPropertyDecorator implements IPropertyDecorator {
     public static java.util.Map<String, IDiagramModel> getIterationLinks(IDiagramModel diagram) {
         java.util.Map<String, IDiagramModel> links = new java.util.LinkedHashMap<>();
         for(com.archimatetool.model.IProperty p : diagram.getProperties()) {
-            if(PROPERTY_NEXT_ITERATION.equals(p.getKey()) 
+            if((PROPERTY_NEXT_ITERATION.equals(p.getKey()) 
                     || PROPERTY_PREVIOUS_ITERATION.equals(p.getKey())
                     || PROPERTY_NEXT_VERSION.equals(p.getKey())       
-                    || PROPERTY_PREVIOUS_VERSION.equals(p.getKey())) {
+                    || PROPERTY_PREVIOUS_VERSION.equals(p.getKey()))
+                    && p.getValue() != null && !p.getValue().isBlank()) {
                 links.put(p.getKey(), resolveIterationTarget(diagram, p.getValue()));
             }
         }

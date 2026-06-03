@@ -8,7 +8,6 @@ import java.util.Map;
 import org.eclipse.emf.ecore.util.EcoreUtil;
 import org.eclipse.gef.commands.Command;
 import org.eclipse.jface.dialogs.Dialog;
-import org.eclipse.jface.dialogs.IDialogConstants;
 import org.eclipse.jface.viewers.ArrayContentProvider;
 import org.eclipse.jface.viewers.LabelProvider;
 import org.eclipse.jface.viewers.TableViewer;
@@ -26,7 +25,6 @@ import com.archimatetool.model.IArchimateDiagramModel;
 import com.archimatetool.model.IDiagramModel;
 import com.archimatetool.model.IDiagramModelArchimateObject;
 import com.archimatetool.model.IDiagramModelArchimateConnection;
-import com.archimatetool.model.IDiagramModelComponent;
 import com.archimatetool.model.IDiagramModelConnection;
 import com.archimatetool.model.IDiagramModelContainer;
 import com.archimatetool.model.IDiagramModelObject;
@@ -64,16 +62,14 @@ public class GenerateDiffViewCommand extends Command {
      * Returns true if the user confirmed a selection.
      */
     public boolean openDialog(Shell shell) {
-        IArchimateModel model = viewA.getArchimateModel();
-
-        // Collect all diagram views except viewA itself
-        List<IDiagramModel> candidates = new ArrayList<>();
-        collectDiagramModels(model.getFolders(), candidates);
-        candidates.remove(viewA);
+        // Use only reachable (connected) views instead of all views in the model
+        List<IDiagramModel> candidates = new ArrayList<>(
+            com.archimatetool.editor.propertysections.IterationPropertyDecorator.getAllReachableViews(viewA)
+        );
 
         if (candidates.isEmpty()) {
             org.eclipse.jface.dialogs.MessageDialog.openInformation(shell,
-                "Compare Views", "No other views found to compare against.");
+                "Compare Views", "No connected views found to compare against.");
             return false;
         }
 
@@ -83,12 +79,14 @@ public class GenerateDiffViewCommand extends Command {
         }
 
         viewB = (IArchimateDiagramModel) dialog.getSelectedView();
-        targetFolder = (IFolder) viewA.eContainer(); // place diff in same folder as viewA
+        targetFolder = (IFolder) viewA.eContainer();
         return true;
     }
 
     @Override
     public void execute() {
+    	System.err.println("!!! GenerateDiffViewCommand.execute called"); //$NON-NLS-1$
+
         diffView = buildDiffView();
 
         // Add to the same folder as viewA
@@ -233,16 +231,8 @@ public class GenerateDiffViewCommand extends Command {
     // -------------------------------------------------------------------------
     // Helper: collect all IDiagramModel instances from all folders
 
-    private void collectDiagramModels(List<IFolder> folders, List<IDiagramModel> result) {
-        for (IFolder folder : folders) {
-            for (Object element : folder.getElements()) {
-                if (element instanceof IDiagramModel) {
-                    result.add((IDiagramModel) element);
-                }
-            }
-            collectDiagramModels(folder.getFolders(), result);
-        }
-    }
+    
+    
 
     // =========================================================================
     // Inner dialog: pick a view to compare against

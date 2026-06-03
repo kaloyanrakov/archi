@@ -65,20 +65,12 @@ import com.archimatetool.model.util.ArchimateModelUtils;
 import com.archimatetool.model.viewpoints.IViewpoint;
 import com.archimatetool.model.viewpoints.ViewpointManager;
 import com.archimatetool.model.IDiagramModel;
-import org.eclipse.zest.layouts.algorithms.SpringLayoutAlgorithm;
-import org.eclipse.zest.layouts.algorithms.HorizontalTreeLayoutAlgorithm;
 import java.util.LinkedList;
 import java.util.HashSet;
-import java.util.LinkedList;
 import java.util.Set;
-import com.archimatetool.model.IDiagramModel;
-import java.util.Set;
-import java.util.LinkedList;
 import org.eclipse.swt.widgets.Display;
 import org.eclipse.zest.core.widgets.GraphNode;
 import com.archimatetool.editor.propertysections.IterationPropertyDecorator.IterationConnection;
-
-import java.util.List;
 import java.util.Map;
 import com.archimatetool.model.IArchimateElement;
 import com.archimatetool.model.IArchimateFactory;
@@ -989,6 +981,10 @@ implements IZestView, ISelectionListener {
      */
     private void fillContextMenu(IMenuManager manager) {
         Object selected = ((IStructuredSelection)getViewer().getSelection()).getFirstElement();
+        // Unwrap GraphNode to get the actual data
+        if(selected instanceof GraphNode graphNode) {
+            selected = graphNode.getData();
+        }
         boolean isEmpty = selected == null;
 
         fDrillDownManager.addNavigationActions(manager);
@@ -1023,7 +1019,12 @@ implements IZestView, ISelectionListener {
             manager.add(fActionProperties);
 
             if(selected instanceof IDiagramModel selectedDm) {
+                System.out.println("=== selected IS IDiagramModel: " + selectedDm.getName()); //$NON-NLS-1$
                 Set<IDiagramModel> reachable = IterationPropertyDecorator.getAllReachableViews(selectedDm);
+                System.out.println("=== reachable count: " + reachable.size()); //$NON-NLS-1$
+                for(IDiagramModel dm : reachable) {
+                    System.out.println("  menu item: " + dm.getName()); //$NON-NLS-1$
+                }
 
                 if(!reachable.isEmpty()) {
                     IMenuManager compareMenu = new MenuManager("Compare with..."); //$NON-NLS-1$
@@ -1038,8 +1039,9 @@ implements IZestView, ISelectionListener {
                     manager.add(new Separator());
                     manager.add(compareMenu);
                 }
-            }
-        }
+            } else {
+                System.out.println("=== selected is NOT IDiagramModel, type: " + (selected == null ? "null" : selected.getClass().getName())); //$NON-NLS-1$
+            }        }
 
         // Other plug-ins can contribute their actions here
         manager.add(new Separator(IWorkbenchActionConstants.MB_ADDITIONS));
@@ -1276,6 +1278,7 @@ implements IZestView, ISelectionListener {
         return Messages.ZestView_2;
     }
     private void generateAndOpenDiffView(IDiagramModel baseView, IDiagramModel targetView) {
+    	System.err.println("!!! ZestView.generateAndOpenDiffView called"); //$NON-NLS-1$
         Map<String, IDiagramModelArchimateObject> baseElems   = collectElementsById(baseView);
         Map<String, IDiagramModelArchimateObject> targetElems = collectElementsById(targetView);
 
@@ -1286,47 +1289,75 @@ implements IZestView, ISelectionListener {
             folder.getElements().add(diffDm);
         }
 
-        final int CELL_W = 160, CELL_H = 100, PADDING = 20, COLS = 5;
-        Map<String, IDiagramModelArchimateObject> diffDmos = new java.util.HashMap<>();
+        // Step 1: Copy elements only from baseView, preserving exact positions
+        Map<IDiagramModelArchimateObject, IDiagramModelArchimateObject> srcToCopy = new java.util.LinkedHashMap<>();
+
+        for(IDiagramModelObject child : baseView.getChildren()) {
+            if(child instanceof IDiagramModelArchimateObject dmo) {
+                IDiagramModelArchimateObject copy = copyDmo(dmo, dmo.getBounds().getX(), dmo.getBounds().getY());
+                IArchimateElement el = dmo.getArchimateElement();
+                if(el != null && !targetElems.containsKey(el.getId())) {
+                    copy.setFillColor("#FFCCCC"); //$NON-NLS-1$
+                }
+                diffDm.getChildren().add(copy);
+                srcToCopy.put(dmo, copy);
+            }
+        }
+
+        // Step 2: Recreate connections, deduplicated by relationship ID
+        
+        System.out.println("=== srcToCopy size: " + srcToCopy.size()); //$NON-NLS-1$
+        for(IDiagramModelArchimateObject srcDmo : srcToCopy.keySet()) {
+            System.out.println("  object: " + srcDmo.getArchimateElement().getName() //$NON-NLS-1$
+                + " sourceConnections: " + srcDmo.getSourceConnections().size() //$NON-NLS-1$
+                + " targetConnections: " + srcDmo.getTargetConnections().size()); //$NON-NLS-1$
+            for(IDiagramModelConnection conn : srcDmo.getSourceConnections()) {
+                System.out.println("    conn type: " + conn.getClass().getName()); //$NON-NLS-1$
+            }
+        }
+        Set<String> addedRelIds = new java.util.HashSet<>();
+
+        for(IDiagramModelArchimateObject srcDmo : srcToCopy.keySet()) {
+            for(IDiagramModelConnection conn : srcDmo.getSourceConnections()) {
+                if(conn instanceof IDiagramModelArchimateConnection dmac) {
+                    IArchimateRelationship rel = dmac.getArchimateRelationship();
+                    if(rel == null) continue;
+                    if(!addedRelIds.add(rel.getId())) continue;
+
+                    IDiagramModelArchimateObject copySrc = srcToCopy.get(conn.getSource());
+                    IDiagramModelArchimateObject copyTgt = srcToCopy.get(conn.getTarget());
+                    if(copySrc != null && copyTgt != null) {
+                        System.out.println("=== Creating connection: " + rel.getId() + //$NON-NLS-1$
+                            " from " + copySrc.getArchimateElement().getName() + //$NON-NLS-1$
+                            " -> " + copyTgt.getArchimateElement().getName()); //$NON-NLS-1$
+                        IDiagramModelArchimateConnection newConn =
+                            IArchimateFactory.eINSTANCE.createDiagramModelArchimateConnection();
+                        newConn.setArchimateRelationship(rel);
+                        newConn.connect(copySrc, copyTgt);
+                    }
+                }
+            }
+        }
+
+        // Step 3: Add elements only in target (added) below existing content — light green
+        int maxY = diffDm.getChildren().stream()
+            .mapToInt(c -> c.getBounds().getY() + Math.max(c.getBounds().getHeight(), 0))
+            .max().orElse(0) + 40;
+
+        final int CELL_W = 160, CELL_H = 80, PADDING = 20, COLS = 5;
         int col = 0, row = 0;
 
-        // Removed (in base, not in target) — light red
-        for(Map.Entry<String, IDiagramModelArchimateObject> e : baseElems.entrySet()) {
-            if(!targetElems.containsKey(e.getKey())) {
-                IDiagramModelArchimateObject copy = copyDmo(e.getValue(), PADDING + col * CELL_W, PADDING + row * CELL_H);
-                copy.setFillColor("#FFCCCC"); //$NON-NLS-1$
-                diffDm.getChildren().add(copy);
-                diffDmos.put(e.getKey(), copy);
-                if(++col >= COLS) { col = 0; row++; }
-            }
-        }
-
-        // Unchanged (in both) — keep original fill
-        for(Map.Entry<String, IDiagramModelArchimateObject> e : baseElems.entrySet()) {
-            if(targetElems.containsKey(e.getKey())) {
-                IDiagramModelArchimateObject copy = copyDmo(e.getValue(), PADDING + col * CELL_W, PADDING + row * CELL_H);
-                diffDm.getChildren().add(copy);
-                diffDmos.put(e.getKey(), copy);
-                if(++col >= COLS) { col = 0; row++; }
-            }
-        }
-
-        // Added (in target, not in base) — light green
         for(Map.Entry<String, IDiagramModelArchimateObject> e : targetElems.entrySet()) {
             if(!baseElems.containsKey(e.getKey())) {
-                IDiagramModelArchimateObject copy = copyDmo(e.getValue(), PADDING + col * CELL_W, PADDING + row * CELL_H);
+                IDiagramModelArchimateObject copy = copyDmo(e.getValue(),
+                    PADDING + col * CELL_W, maxY + row * CELL_H);
                 copy.setFillColor("#CCFFCC"); //$NON-NLS-1$
                 diffDm.getChildren().add(copy);
-                diffDmos.put(e.getKey(), copy);
                 if(++col >= COLS) { col = 0; row++; }
             }
         }
 
-        addDiffConnections(baseView,   diffDmos, baseElems,   targetElems, false);
-        addDiffConnections(targetView, diffDmos, targetElems, baseElems,   true);
-
         com.archimatetool.editor.ui.services.EditorManager.openDiagramEditor(diffDm, false);
-
     }
 
     private Map<String, IDiagramModelArchimateObject> collectElementsById(IDiagramModel view) {

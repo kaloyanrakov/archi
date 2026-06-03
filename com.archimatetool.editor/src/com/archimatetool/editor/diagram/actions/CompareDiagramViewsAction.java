@@ -6,7 +6,6 @@ import org.eclipse.ui.IWorkbenchPart;
 import com.archimatetool.editor.tools.GenerateDiffViewCommand;
 import com.archimatetool.model.IArchimateDiagramModel;
 import com.archimatetool.model.IDiagramModel;
-import com.archimatetool.model.IArchimateDiagramModel;
 /**
  * Action to compare the current diagram view with another and generate a diff view.
  */
