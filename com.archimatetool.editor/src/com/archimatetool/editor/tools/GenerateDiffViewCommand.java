@@ -29,7 +29,9 @@ import com.archimatetool.model.IDiagramModelConnection;
 import com.archimatetool.model.IDiagramModelContainer;
 import com.archimatetool.model.IDiagramModelObject;
 import com.archimatetool.model.IFolder;
-
+import java.util.Set;
+import com.archimatetool.model.IArchimateElement;
+import com.archimatetool.model.IArchimateRelationship;
 /**
  * Command that generates a diff view between two ArchiMate diagram views.
  *
@@ -85,12 +87,130 @@ public class GenerateDiffViewCommand extends Command {
 
     @Override
     public void execute() {
-    	System.err.println("!!! GenerateDiffViewCommand.execute called"); //$NON-NLS-1$
+        Map<String, IDiagramModelArchimateObject> baseElems   = collectElementsById(viewA);
+        Map<String, IDiagramModelArchimateObject> targetElems = collectElementsById(viewB);
 
-        diffView = buildDiffView();
-
-        // Add to the same folder as viewA
+        diffView = IArchimateFactory.eINSTANCE.createArchimateDiagramModel();
+        diffView.setName("Diff: " + viewA.getName() + " \u2192 " + viewB.getName()); //$NON-NLS-1$
         targetFolder.getElements().add(diffView);
+
+        // Step 1: Copy elements from viewA preserving exact positions
+        // Map from original viewA object -> copy in diffView
+        Map<IDiagramModelArchimateObject, IDiagramModelArchimateObject> srcToCopy = new java.util.LinkedHashMap<>();
+
+        for(IDiagramModelObject child : viewA.getChildren()) {
+            if(child instanceof IDiagramModelArchimateObject dmo) {
+                IDiagramModelArchimateObject copy = copyDmo(dmo, dmo.getBounds().getX(), dmo.getBounds().getY());
+                com.archimatetool.model.IArchimateElement el = dmo.getArchimateElement();
+                if(el != null && !targetElems.containsKey(el.getId())) {
+                    copy.setFillColor("#FFCCCC"); //$NON-NLS-1$
+                }
+                diffView.getChildren().add(copy);
+                srcToCopy.put(dmo, copy);
+            }
+        }
+
+        // Step 2: Recreate connections from viewA, deduplicated by relationship ID
+        Set<String> addedRelIds = new java.util.HashSet<>();
+        for(IDiagramModelArchimateObject srcDmo : srcToCopy.keySet()) {
+            for(IDiagramModelConnection conn : srcDmo.getSourceConnections()) {
+                if(conn instanceof IDiagramModelArchimateConnection dmac) {
+                    IArchimateRelationship rel = dmac.getArchimateRelationship();
+                    if(rel == null || !addedRelIds.add(rel.getId())) continue;
+                    IDiagramModelArchimateObject copySrc = srcToCopy.get(conn.getSource());
+                    IDiagramModelArchimateObject copyTgt = srcToCopy.get(conn.getTarget());
+                    if(copySrc != null && copyTgt != null) {
+                        IDiagramModelArchimateConnection newConn =
+                            IArchimateFactory.eINSTANCE.createDiagramModelArchimateConnection();
+                        newConn.setArchimateRelationship(rel);
+                        newConn.connect(copySrc, copyTgt);
+                    }
+                }
+            }
+        }
+
+        // Step 3: Add elements only in target (added) below — light green
+        // Also build a map from viewB element ID -> copy in diffView for connection wiring
+        int maxY = diffView.getChildren().stream()
+            .mapToInt(c -> c.getBounds().getY() + Math.max(c.getBounds().getHeight(), 0))
+            .max().orElse(0) + 40;
+
+        final int CELL_W = 160, CELL_H = 80, PADDING = 20, COLS = 5;
+        int col = 0, row = 0;
+
+        // Map from viewB object -> copy in diffView (for added elements)
+        Map<IDiagramModelArchimateObject, IDiagramModelArchimateObject> srcToCopyB = new java.util.LinkedHashMap<>();
+
+        for(Map.Entry<String, IDiagramModelArchimateObject> e : targetElems.entrySet()) {
+            if(!baseElems.containsKey(e.getKey())) {
+                IDiagramModelArchimateObject copy = copyDmo(e.getValue(),
+                    PADDING + col * CELL_W, maxY + row * CELL_H);
+                copy.setFillColor("#CCFFCC"); //$NON-NLS-1$
+                diffView.getChildren().add(copy);
+                srcToCopyB.put(e.getValue(), copy);
+                if(++col >= COLS) { col = 0; row++; }
+            }
+        }
+
+        // Step 4: Wire connections from viewB for added elements
+        // Build a combined element-ID -> diffView copy map for lookup
+        Map<String, IDiagramModelArchimateObject> diffById = new java.util.LinkedHashMap<>();
+        for(Map.Entry<IDiagramModelArchimateObject, IDiagramModelArchimateObject> e : srcToCopy.entrySet()) {
+            com.archimatetool.model.IArchimateElement el = e.getKey().getArchimateElement();
+            if(el != null) diffById.put(el.getId(), e.getValue());
+        }
+        for(Map.Entry<IDiagramModelArchimateObject, IDiagramModelArchimateObject> e : srcToCopyB.entrySet()) {
+            com.archimatetool.model.IArchimateElement el = e.getKey().getArchimateElement();
+            if(el != null) diffById.put(el.getId(), e.getValue());
+        }
+
+        for(IDiagramModelObject child : viewB.getChildren()) {
+            if(!(child instanceof IDiagramModelArchimateObject srcDmo)) continue;
+            for(IDiagramModelConnection conn : srcDmo.getSourceConnections()) {
+                if(!(conn instanceof IDiagramModelArchimateConnection dmac)) continue;
+                IArchimateRelationship rel = dmac.getArchimateRelationship();
+                if(rel == null || !addedRelIds.add(rel.getId())) continue; // skip already added
+                String srcId = rel.getSource() != null ? rel.getSource().getId() : null;
+                String tgtId = rel.getTarget() != null ? rel.getTarget().getId() : null;
+                if(srcId == null || tgtId == null) continue;
+                IDiagramModelArchimateObject copySrc = diffById.get(srcId);
+                IDiagramModelArchimateObject copyTgt = diffById.get(tgtId);
+                if(copySrc != null && copyTgt != null) {
+                    IDiagramModelArchimateConnection newConn =
+                        IArchimateFactory.eINSTANCE.createDiagramModelArchimateConnection();
+                    newConn.setArchimateRelationship(rel);
+                    newConn.connect(copySrc, copyTgt);
+                }
+            }
+        }
+
+        com.archimatetool.editor.ui.services.EditorManager.openDiagramEditor(diffView, false);
+    }
+
+    private Map<String, IDiagramModelArchimateObject> collectElementsById(IDiagramModel view) {
+        Map<String, IDiagramModelArchimateObject> map = new java.util.LinkedHashMap<>();
+        for(IDiagramModelObject child : view.getChildren()) {
+            if(child instanceof IDiagramModelArchimateObject dmo) {
+                com.archimatetool.model.IArchimateElement el = dmo.getArchimateElement();
+                if(el != null && el.getId() != null) {
+                    map.put(el.getId(), dmo);
+                }
+            }
+        }
+        return map;
+    }
+
+    private IDiagramModelArchimateObject copyDmo(IDiagramModelArchimateObject src, int x, int y) {
+        IDiagramModelArchimateObject copy = IArchimateFactory.eINSTANCE.createDiagramModelArchimateObject();
+        copy.setArchimateElement(src.getArchimateElement());
+        int w = src.getBounds().getWidth()  > 0 ? src.getBounds().getWidth()  : 120;
+        int h = src.getBounds().getHeight() > 0 ? src.getBounds().getHeight() : 55;
+        copy.setBounds(x, y, w, h);
+        copy.setType(src.getType());
+        copy.setTextAlignment(src.getTextAlignment());
+        copy.setTextPosition(src.getTextPosition());
+        copy.setFillColor(src.getFillColor());
+        return copy;
     }
 
     @Override
@@ -107,136 +227,6 @@ public class GenerateDiffViewCommand extends Command {
         }
     }
 
-    // -------------------------------------------------------------------------
-
-    private IArchimateDiagramModel buildDiffView() {
-        IArchimateDiagramModel diff = IArchimateFactory.eINSTANCE.createArchimateDiagramModel();
-        diff.setName("Diff: " + viewA.getName() + " vs " + viewB.getName());
-
-        // Build a concept-id → object map for each view
-        Map<String, IDiagramModelObject> mapA = buildConceptIdMap(viewA);
-        Map<String, IDiagramModelObject> mapB = buildConceptIdMap(viewB);
-
-        // --- Unchanged & Removed: iterate A ---
-        for (Map.Entry<String, IDiagramModelObject> entry : mapA.entrySet()) {
-            IDiagramModelObject copy = copyObject(entry.getValue());
-            if (!mapB.containsKey(entry.getKey())) {
-                // Removed — fade it out
-                copy.setAlpha(REMOVED_ALPHA);
-            }
-            // else: unchanged — leave at default alpha
-            diff.getChildren().add(copy);
-        }
-
-        // --- Added: iterate B for things not in A ---
-        for (Map.Entry<String, IDiagramModelObject> entry : mapB.entrySet()) {
-            if (!mapA.containsKey(entry.getKey())) {
-                IDiagramModelObject copy = copyObject(entry.getValue());
-                copy.setFillColor(ADDED_FILL_COLOR);
-                diff.getChildren().add(copy);
-            }
-        }
-
-        // --- Connections ---
-        addConnections(viewA, diff, mapA, mapB, true);
-        addConnections(viewB, diff, mapA, mapB, false);
-
-        return diff;
-    }
-
-    /**
-     * Build a map of archimate-concept-id → IDiagramModelObject for all objects
-     * in a view (including nested ones, flattened for comparison purposes).
-     */
-    private Map<String, IDiagramModelObject> buildConceptIdMap(IDiagramModel view) {
-        Map<String, IDiagramModelObject> map = new HashMap<>();
-        collectObjects(view.getChildren(), map);
-        return map;
-    }
-
-    private void collectObjects(List<IDiagramModelObject> objects, Map<String, IDiagramModelObject> map) {
-        for (IDiagramModelObject obj : objects) {
-            if (obj instanceof IDiagramModelArchimateObject) {
-                String id = ((IDiagramModelArchimateObject) obj).getArchimateConcept().getId();
-                map.putIfAbsent(id, obj);
-            }
-            if (obj instanceof IDiagramModelContainer) {
-                collectObjects(((IDiagramModelContainer) obj).getChildren(), map);
-            }
-        }
-    }
-
-    private IDiagramModelObject copyObject(IDiagramModelObject original) {
-        return EcoreUtil.copy(original);
-    }
-
-    /**
-     * Copy connections from a source view into the diff view.
-     *
-     * @param fromView   the source view (A or B)
-     * @param diff       the target diff view
-     * @param mapA       concept-id map for view A
-     * @param mapB       concept-id map for view B
-     * @param isViewA    true if we're processing A's connections (removed ones get faded)
-     */
-    private void addConnections(IDiagramModel fromView, IArchimateDiagramModel diff,
-            Map<String, IDiagramModelObject> mapA, Map<String, IDiagramModelObject> mapB,
-            boolean isViewA) {
-
-        List<IDiagramModelConnection> connections = new ArrayList<>();
-        collectConnections(fromView.getChildren(), connections);
-
-        for (IDiagramModelConnection conn : connections) {
-            if (!(conn instanceof IDiagramModelArchimateConnection)) continue;
-
-            IDiagramModelArchimateConnection archConn = (IDiagramModelArchimateConnection) conn;
-            String conceptId = archConn.getArchimateConcept().getId();
-
-            boolean inA = mapA.values().stream()
-                .anyMatch(o -> o instanceof IDiagramModelArchimateObject &&
-                    ((IDiagramModelArchimateObject) o).getArchimateConcept().getId().equals(conceptId));
-            boolean inB = mapB.values().stream()
-                .anyMatch(o -> o instanceof IDiagramModelArchimateObject &&
-                    ((IDiagramModelArchimateObject) o).getArchimateConcept().getId().equals(conceptId));
-
-            // Only add if not already added from the other view
-            if (!isViewA && inA) continue; // already handled when processing A
-
-            IDiagramModelArchimateConnection connCopy = EcoreUtil.copy(archConn);
-
-            if (isViewA && !inB) {
-                // Removed connection — indicate with grey line color (no alpha available on connections)
-                connCopy.setLineColor("#AAAAAA"); //$NON-NLS-1$
-            } else if (!isViewA && !inA) {
-                // Added connection — tint green
-                connCopy.setLineColor(ADDED_FILL_COLOR);
-            }
-
-            diff.getChildren(); // ensure resolved
-            // Note: connections in Archi are attached to their source/target objects.
-            // They need to be re-wired after objects are added; handle this in post-processing
-            // or use the same approach as the existing ViewImporter.
-        }
-    }
-
-    private void collectConnections(List<IDiagramModelObject> objects, List<IDiagramModelConnection> result) {
-        for (IDiagramModelObject obj : objects) {
-            result.addAll(obj.getSourceConnections());
-            if (obj instanceof IDiagramModelContainer) {
-                collectConnections(((IDiagramModelContainer) obj).getChildren(), result);
-            }
-        }
-    }
-
-    // -------------------------------------------------------------------------
-    // Helper: collect all IDiagramModel instances from all folders
-
-    
-    
-
-    // =========================================================================
-    // Inner dialog: pick a view to compare against
-    // =========================================================================
 
     private static class SelectViewDialog extends Dialog {
         private final List<IDiagramModel> views;
