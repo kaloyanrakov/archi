@@ -32,6 +32,7 @@ import com.archimatetool.model.IFolder;
 import java.util.Set;
 import com.archimatetool.model.IArchimateElement;
 import com.archimatetool.model.IArchimateRelationship;
+import com.archimatetool.model.IDiagramModelGroup;
 /**
  * Command that generates a diff view between two ArchiMate diagram views.
  *
@@ -43,11 +44,7 @@ import com.archimatetool.model.IArchimateRelationship;
 public class GenerateDiffViewCommand extends Command {
 
     /** Alpha value for "removed" elements — roughly 30% opacity */
-    private static final int REMOVED_ALPHA = 80;
-    private static final String REMOVED_LINE_COLOR = "#AAAAAA"; //$NON-NLS-1$
-
-    /** Fill colour for "added" elements expressed as RGB hex string — pale green */
-    private static final String ADDED_FILL_COLOR = "#AAFFAA"; //$NON-NLS-1$
+    
 
     private final IArchimateDiagramModel viewA;
     private IArchimateDiagramModel viewB;
@@ -96,19 +93,11 @@ public class GenerateDiffViewCommand extends Command {
 
         // Step 1: Copy elements from viewA preserving exact positions
         // Map from original viewA object -> copy in diffView
+     // Step 1: Copy ALL elements from viewA recursively, using absolute positions
         Map<IDiagramModelArchimateObject, IDiagramModelArchimateObject> srcToCopy = new java.util.LinkedHashMap<>();
+        copyViewRecursive(viewA.getChildren(), diffView, targetElems, srcToCopy);
 
-        for(IDiagramModelObject child : viewA.getChildren()) {
-            if(child instanceof IDiagramModelArchimateObject dmo) {
-                IDiagramModelArchimateObject copy = copyDmo(dmo, dmo.getBounds().getX(), dmo.getBounds().getY());
-                com.archimatetool.model.IArchimateElement el = dmo.getArchimateElement();
-                if(el != null && !targetElems.containsKey(el.getId())) {
-                    copy.setFillColor("#FFCCCC"); //$NON-NLS-1$
-                }
-                diffView.getChildren().add(copy);
-                srcToCopy.put(dmo, copy);
-            }
-        }
+       
 
         // Step 2: Recreate connections from viewA, deduplicated by relationship ID
         Set<String> addedRelIds = new java.util.HashSet<>();
@@ -129,29 +118,32 @@ public class GenerateDiffViewCommand extends Command {
             }
         }
 
-        // Step 3: Add elements only in target (added) below — light green
-        // Also build a map from viewB element ID -> copy in diffView for connection wiring
-        int maxY = diffView.getChildren().stream()
-            .mapToInt(c -> c.getBounds().getY() + Math.max(c.getBounds().getHeight(), 0))
-            .max().orElse(0) + 40;
-
+     // Step 3: Two-pass — groups first, then root items below everything
+        int maxY = getMaxYRecursive(diffView.getChildren(), 0) + 40;
         final int CELL_W = 160, CELL_H = 80, PADDING = 20, COLS = 5;
-        int col = 0, row = 0;
 
-        // Map from viewB object -> copy in diffView (for added elements)
+        Map<String, IDiagramModelContainer> diffGroupsByName = new java.util.LinkedHashMap<>();
+        collectGroupsByName(diffView.getChildren(), diffGroupsByName);
+
         Map<IDiagramModelArchimateObject, IDiagramModelArchimateObject> srcToCopyB = new java.util.LinkedHashMap<>();
+        Map<IDiagramModelContainer, int[]> groupCounters = new java.util.LinkedHashMap<>();
 
-        for(Map.Entry<String, IDiagramModelArchimateObject> e : targetElems.entrySet()) {
-            if(!baseElems.containsKey(e.getKey())) {
-                IDiagramModelArchimateObject copy = copyDmo(e.getValue(),
-                    PADDING + col * CELL_W, maxY + row * CELL_H);
-                copy.setFillColor("#CCFFCC"); //$NON-NLS-1$
-                diffView.getChildren().add(copy);
-                srcToCopyB.put(e.getValue(), copy);
-                if(++col >= COLS) { col = 0; row++; }
-            }
+        // First pass: add groups and their contents, collect new root items separately
+        List<IDiagramModelArchimateObject> newRootDmos = new java.util.ArrayList<>();
+        addNewElementsFromViewB(viewB.getChildren(), diffView, diffGroupsByName, baseElems,
+            srcToCopyB, newRootDmos, groupCounters, CELL_W, CELL_H, PADDING, COLS);
+
+        // Second pass: now that all groups are placed, calculate true final maxY
+        int finalMaxY = getMaxYRecursive(diffView.getChildren(), 0) + 40;
+        int col = 0, row = 0;
+        for(IDiagramModelArchimateObject dmo : newRootDmos) {
+            IDiagramModelArchimateObject copy = copyDmo(dmo,
+                PADDING + col * CELL_W, finalMaxY + row * CELL_H);
+            copy.setFillColor("#CCFFCC"); //$NON-NLS-1$
+            diffView.getChildren().add(copy);
+            srcToCopyB.put(dmo, copy);
+            if(++col >= COLS) { col = 0; row++; }
         }
-
         // Step 4: Wire connections from viewB for added elements
         // Build a combined element-ID -> diffView copy map for lookup
         Map<String, IDiagramModelArchimateObject> diffById = new java.util.LinkedHashMap<>();
@@ -164,12 +156,11 @@ public class GenerateDiffViewCommand extends Command {
             if(el != null) diffById.put(el.getId(), e.getValue());
         }
 
-        for(IDiagramModelObject child : viewB.getChildren()) {
-            if(!(child instanceof IDiagramModelArchimateObject srcDmo)) continue;
+        for(IDiagramModelArchimateObject srcDmo : collectAllDmos(viewB)) {
             for(IDiagramModelConnection conn : srcDmo.getSourceConnections()) {
                 if(!(conn instanceof IDiagramModelArchimateConnection dmac)) continue;
                 IArchimateRelationship rel = dmac.getArchimateRelationship();
-                if(rel == null || !addedRelIds.add(rel.getId())) continue; // skip already added
+                if(rel == null || !addedRelIds.add(rel.getId())) continue;
                 String srcId = rel.getSource() != null ? rel.getSource().getId() : null;
                 String tgtId = rel.getTarget() != null ? rel.getTarget().getId() : null;
                 if(srcId == null || tgtId == null) continue;
@@ -183,18 +174,185 @@ public class GenerateDiffViewCommand extends Command {
                 }
             }
         }
-
+        nudgeOverlappingRootItems(diffView);
         com.archimatetool.editor.ui.services.EditorManager.openDiagramEditor(diffView, false);
     }
+    private void expandGroupToFit(IDiagramModelObject group, int requiredRight, int requiredBottom) {
+        int currentW = Math.max(group.getBounds().getWidth(), 0);
+        int currentH = Math.max(group.getBounds().getHeight(), 0);
+        int newW = Math.max(currentW, requiredRight);
+        int newH = Math.max(currentH, requiredBottom);
+        if(newW != currentW || newH != currentH) {
+            group.setBounds(group.getBounds().getX(), group.getBounds().getY(), newW, newH);
+        }
+    }
+    
+    private int getMaxYRecursive(java.util.List<IDiagramModelObject> children, int offsetY) {
+        int maxY = 0;
+        for(IDiagramModelObject child : children) {
+            int absY = offsetY + child.getBounds().getY();
+            int bottom = absY + Math.max(child.getBounds().getHeight(), 0);
+            maxY = Math.max(maxY, bottom);
+            if(child instanceof IDiagramModelContainer container) {
+                maxY = Math.max(maxY, getMaxYRecursive(container.getChildren(), absY));
+            }
+        }
+        return maxY;
+    }
 
+
+    private void collectGroupsByName(java.util.List<IDiagramModelObject> children, Map<String, IDiagramModelContainer> result) {
+    	for(IDiagramModelObject child : children) {
+    		if(child instanceof IDiagramModelGroup group) {
+    			if(group.getName() != null) {
+    				result.put(group.getName(), group);
+    			}
+    			collectGroupsByName(group.getChildren(), result);
+    			}
+    	}
+    }
+    
+    private void nudgeOverlappingRootItems(IArchimateDiagramModel diffView) {
+        List<IDiagramModelObject> rootChildren = new ArrayList<>(diffView.getChildren());
+        for(IDiagramModelObject item : rootChildren) {
+            if(!(item instanceof IDiagramModelArchimateObject)) continue;
+            boolean overlapping = true;
+            while(overlapping) {
+                overlapping = false;
+                for(IDiagramModelObject other : rootChildren) {
+                    if(other != item && other instanceof IDiagramModelGroup && boundsContain(other, item)) {
+                        // Move item just to the right of the overlapping group
+                        int groupRight = other.getBounds().getX() + other.getBounds().getWidth();
+                        item.setBounds(groupRight + 5, item.getBounds().getY(),
+                            item.getBounds().getWidth(), item.getBounds().getHeight());
+                        overlapping = true; // re-check in case it now overlaps another group
+                        break;
+                    }
+                }
+            }
+        }
+    }
+    private boolean boundsContain(IDiagramModelObject outer, IDiagramModelObject inner) {
+        int ox1 = outer.getBounds().getX();
+        int oy1 = outer.getBounds().getY();
+        int ox2 = ox1 + outer.getBounds().getWidth();
+        int oy2 = oy1 + outer.getBounds().getHeight();
+        int ix1 = inner.getBounds().getX();
+        int iy1 = inner.getBounds().getY();
+        int ix2 = ix1 + inner.getBounds().getWidth();
+        int iy2 = iy1 + inner.getBounds().getHeight();
+        // Check if inner overlaps with outer at all
+        return ix1 < ox2 && ix2 > ox1 && iy1 < oy2 && iy2 > oy1;
+    }
+
+    private void addNewElementsFromViewB(
+            java.util.List<IDiagramModelObject> srcChildren,
+            IDiagramModelContainer destContainer,
+            Map<String, IDiagramModelContainer> diffGroupsByName,
+            Map<String, IDiagramModelArchimateObject> baseElems,
+            Map<IDiagramModelArchimateObject, IDiagramModelArchimateObject> srcToCopyB,
+            List<IDiagramModelArchimateObject> newRootDmos,
+            Map<IDiagramModelContainer, int[]> groupCounters,
+            int CELL_W, int CELL_H, int PADDING, int COLS) {
+
+        for(IDiagramModelObject child : srcChildren) {
+            if(child instanceof IDiagramModelArchimateObject dmo) {
+                IArchimateElement el = dmo.getArchimateElement();
+                if(el == null || baseElems.containsKey(el.getId())) continue;
+
+                if(destContainer instanceof IDiagramModel) {
+                    // Defer root items — collect for second pass
+                    newRootDmos.add(dmo);
+                } else {
+                    // Inside a group — place immediately with relative position
+                    if(!groupCounters.containsKey(destContainer)) {
+                        int baseY = PADDING;
+                        for(IDiagramModelObject existing : destContainer.getChildren()) {
+                            int bottom = existing.getBounds().getY() + Math.max(existing.getBounds().getHeight(), 0);
+                            baseY = Math.max(baseY, bottom + PADDING);
+                        }
+                        groupCounters.put(destContainer, new int[]{0, 0, baseY});
+                    }
+                    int[] gc = groupCounters.get(destContainer);
+                    int x = PADDING + gc[0] * CELL_W;
+                    int y = gc[2] + gc[1] * CELL_H;
+                    IDiagramModelArchimateObject copy = copyDmo(dmo, x, y);
+                    copy.setFillColor("#CCFFCC"); //$NON-NLS-1$
+                    destContainer.getChildren().add(copy);
+                    srcToCopyB.put(dmo, copy);
+                    if(++gc[0] >= COLS) { gc[0] = 0; gc[1]++; }
+                    expandGroupToFit((IDiagramModelObject) destContainer, x + CELL_W + PADDING, y + CELL_H + PADDING);
+                }
+
+            } else if(child instanceof IDiagramModelGroup group) {
+                String groupName = group.getName();
+                IDiagramModelContainer targetGroup;
+                if(groupName != null && diffGroupsByName.containsKey(groupName)) {
+                    targetGroup = diffGroupsByName.get(groupName);
+                } else {
+                    targetGroup = copyContainerShell(child);
+                    destContainer.getChildren().add((IDiagramModelObject) targetGroup);
+                    if(groupName != null) diffGroupsByName.put(groupName, targetGroup);
+                }
+                addNewElementsFromViewB(group.getChildren(), targetGroup, diffGroupsByName,
+                    baseElems, srcToCopyB, newRootDmos, groupCounters, CELL_W, CELL_H, PADDING, COLS);
+            }
+        }
+    }
+    
+    private void copyViewRecursive(
+            java.util.List<IDiagramModelObject> srcChildren,
+            IDiagramModelContainer destContainer,
+            Map<String, IDiagramModelArchimateObject> targetElems,
+            Map<IDiagramModelArchimateObject, IDiagramModelArchimateObject> srcToCopy) {
+
+        for(IDiagramModelObject child : srcChildren) {
+            if(child instanceof IDiagramModelArchimateObject dmo) {
+            	
+                IDiagramModelArchimateObject copy = copyDmo(dmo, dmo.getBounds().getX(), dmo.getBounds().getY());
+                IArchimateElement el = dmo.getArchimateElement();
+                if(el != null && !targetElems.containsKey(el.getId())) {
+                    copy.setFillColor("#FFCCCC"); //$NON-NLS-1$
+                }
+                destContainer.getChildren().add(copy);
+                srcToCopy.put(dmo, copy);
+                // Recurse into nested children of this element
+                if(!dmo.getChildren().isEmpty()) {
+                    copyViewRecursive(dmo.getChildren(), copy, targetElems, srcToCopy);
+                }
+            } else if(child instanceof IDiagramModelContainer container) {
+                // It's a group — copy shell then recurse into its children
+                IDiagramModelContainer groupCopy = copyContainerShell(child);
+                destContainer.getChildren().add((IDiagramModelObject) groupCopy);
+                copyViewRecursive(container.getChildren(), groupCopy, targetElems, srcToCopy);
+            }
+        }
+    }
+
+    private IDiagramModelContainer copyContainerShell(IDiagramModelObject src) {
+        IDiagramModelObject copy;
+        if(src instanceof com.archimatetool.model.IDiagramModelGroup) {
+            copy = IArchimateFactory.eINSTANCE.createDiagramModelGroup();
+        } else {
+            copy = (IDiagramModelObject) IArchimateFactory.eINSTANCE.create(src.eClass());
+        }
+        int w = src.getBounds().getWidth()  > 0 ? src.getBounds().getWidth()  : 200;
+        int h = src.getBounds().getHeight() > 0 ? src.getBounds().getHeight() : 100;
+        copy.setBounds(src.getBounds().getX(), src.getBounds().getY(), w, h);
+        copy.setFillColor(src.getFillColor());
+        copy.setLineColor(src.getLineColor());
+        if(src instanceof com.archimatetool.model.INameable nameable &&
+           copy instanceof com.archimatetool.model.INameable copyNameable) {
+            copyNameable.setName(nameable.getName());
+        }
+        return (IDiagramModelContainer) copy;
+    }
     private Map<String, IDiagramModelArchimateObject> collectElementsById(IDiagramModel view) {
         Map<String, IDiagramModelArchimateObject> map = new java.util.LinkedHashMap<>();
-        for(IDiagramModelObject child : view.getChildren()) {
-            if(child instanceof IDiagramModelArchimateObject dmo) {
-                com.archimatetool.model.IArchimateElement el = dmo.getArchimateElement();
-                if(el != null && el.getId() != null) {
-                    map.put(el.getId(), dmo);
-                }
+        for(IDiagramModelArchimateObject dmo : collectAllDmos(view)) {
+            com.archimatetool.model.IArchimateElement el = dmo.getArchimateElement();
+            if(el != null && el.getId() != null) {
+                map.put(el.getId(), dmo);
             }
         }
         return map;
@@ -218,6 +376,35 @@ public class GenerateDiffViewCommand extends Command {
         if (diffView != null) {
             targetFolder.getElements().remove(diffView);
         }
+    }
+    private java.util.List<IDiagramModelArchimateObject> collectAllDmos(IDiagramModel view) {
+        java.util.List<IDiagramModelArchimateObject> list = new java.util.ArrayList<>();
+        collectAllDmosRecursive(view.getChildren(), list);
+        return list;
+    }
+
+    private void collectAllDmosRecursive(java.util.List<IDiagramModelObject> children,
+                                          java.util.List<IDiagramModelArchimateObject> result) {
+        for(IDiagramModelObject child : children) {
+            if(child instanceof IDiagramModelArchimateObject dmo) {
+                result.add(dmo);
+            }
+            if(child instanceof IDiagramModelContainer container) {
+                collectAllDmosRecursive(container.getChildren(), result);
+            }
+        }
+    }
+
+    private int[] getAbsolutePosition(IDiagramModelObject dmo) {
+        int x = dmo.getBounds().getX();
+        int y = dmo.getBounds().getY();
+        org.eclipse.emf.ecore.EObject container = dmo.eContainer();
+        while(container instanceof IDiagramModelObject parent) {
+            x += parent.getBounds().getX();
+            y += parent.getBounds().getY();
+            container = parent.eContainer();
+        }
+        return new int[]{x, y};
     }
 
     @Override
@@ -281,5 +468,6 @@ public class GenerateDiffViewCommand extends Command {
         IDiagramModel getSelectedView() {
             return selectedView;
         }
+        
     }
 }
