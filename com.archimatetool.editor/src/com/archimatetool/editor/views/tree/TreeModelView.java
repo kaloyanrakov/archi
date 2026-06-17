@@ -87,12 +87,6 @@ import com.archimatetool.model.IArchimatePackage;
 import com.archimatetool.model.IDiagramModel;
 import com.archimatetool.model.IFolder;
 import com.archimatetool.model.IFolderContainer;
-import com.archimatetool.editor.propertysections.IPropertyDecorator;
-import com.archimatetool.editor.propertysections.PropertyDecoratorRegistry;
-import com.archimatetool.model.IArchimateElement;
-import com.archimatetool.model.IProperty;
-import com.archimatetool.editor.model.commands.EObjectFeatureCommand;
-import org.eclipse.gef.commands.CompoundCommand;
 
 /**
  * Tree Model View
@@ -497,47 +491,7 @@ implements ITreeModelView, IUIRequestListener {
             
             manager.add(fActionRename);
             
-            boolean hasElements = selection.toList().stream().anyMatch(o -> o instanceof IArchimateElement);
-            if(hasElements) {
-                MenuManager levelMenu = new MenuManager("Batch Assign Level"); //$NON-NLS-1$
-                for(String level : PropertyDecoratorRegistry.getAllDecorators().stream()
-                        .filter(d -> "Model Level".equals(d.getPropertyKey())) //$NON-NLS-1$
-                        .findFirst()
-                        .map(d -> d.getRestrictedValues())
-                        .orElse(new String[0])) {
-                    if(level.isEmpty()) continue;
-                    final String finalLevel = level;
-                    levelMenu.add(new Action(level) {
-                        @Override
-                        public void run() {
-                            CompoundCommand compoundCmd = new CompoundCommand();
-                            IPropertyDecorator decorator = PropertyDecoratorRegistry.getDecorator("Model Level"); //$NON-NLS-1$
-                            for(Object obj : selection.toList()) {
-                                if(!(obj instanceof IArchimateElement element)) continue;
-                                if(element.getArchimateModel() == null) continue;
-                                for(IProperty p : element.getProperties()) {
-                                    if("Model Level".equals(p.getKey())) { //$NON-NLS-1$
-                                        compoundCmd.add(new EObjectFeatureCommand(
-                                            "Set Model Level", p, //$NON-NLS-1$
-                                            IArchimatePackage.Literals.PROPERTY__VALUE, finalLevel));
-                                        break;
-                                    }
-                                }
-                                if(decorator != null) {
-                                    decorator.contributeCommands(element, finalLevel, compoundCmd);
-                                }
-                            }
-                            if(compoundCmd.canExecute()) {
-                                org.eclipse.gef.commands.CommandStack stack = 
-                                    (org.eclipse.gef.commands.CommandStack)getActiveArchimateModel().getAdapter(
-                                        org.eclipse.gef.commands.CommandStack.class);
-                                stack.execute(compoundCmd.unwrap());
-                            }
-                        }
-                    });
-                }
-                manager.add(levelMenu);
-            }
+            
 
             manager.add(new Separator("start_extensions")); //$NON-NLS-1$
             manager.add(fActionGenerateView);

@@ -99,9 +99,7 @@ import com.archimatetool.model.IArchimatePackage;
 import com.archimatetool.model.IProperties;
 import com.archimatetool.model.IProperty;
 import com.archimatetool.model.util.LightweightEContentAdapter;
-import com.archimatetool.model.IArchimateElement;
 import com.archimatetool.editor.propertysections.IterationPropertyDecorator;
-import com.archimatetool.editor.propertysections.LevelingPropertyDecorator;
 import com.archimatetool.model.IDiagramModel;
 
 
@@ -222,15 +220,11 @@ public class UserPropertiesSection extends AbstractECorePropertySection {
         }
     }
     
-    private static final String[] MODEL_LEVEL_VALUES = {
-            "Level 1",
-            "Level 2",
-            "Level 3"
-        };
+   
     
     private static boolean isReadOnlyProperty(String key) {
-        return "Model Level".equals(key)
-            || "Previous Iteration".equals(key)
+        return 
+            "Previous Iteration".equals(key)
             || "Next Iteration".equals(key)
             || "Previous Version".equals(key)
             || "Next Version".equals(key);
@@ -267,47 +261,19 @@ public class UserPropertiesSection extends AbstractECorePropertySection {
         if(fPropertiesElements.isEmpty()) return;
 
         for(IProperties target : fPropertiesElements) {
-            if(!(target instanceof IArchimateElement) && !(target instanceof IDiagramModel)) {
-                continue;
-            }
+            if(!(target instanceof IDiagramModel)) continue;
 
-            boolean isView = target instanceof IDiagramModel;
             boolean changed = false;
             ((org.eclipse.emf.ecore.EObject)target).eSetDeliver(false);
             try {
-            	if(isView) {
-            	    boolean removed = target.getProperties().removeIf(p -> "Model Level".equals(p.getKey()));
-            	    if(removed) changed = true;
-            	}
-            	else {
-            	    boolean removed = target.getProperties().removeIf(p -> 
-            	        IterationPropertyDecorator.PROPERTY_PREVIOUS_ITERATION.equals(p.getKey()) ||
-            	        IterationPropertyDecorator.PROPERTY_NEXT_ITERATION.equals(p.getKey()) ||
-            	        IterationPropertyDecorator.PROPERTY_PREVIOUS_VERSION.equals(p.getKey()) ||
-            	        IterationPropertyDecorator.PROPERTY_NEXT_VERSION.equals(p.getKey()));
-            	    if(removed) changed = true;
-            	}
-
-                // ADD missing properties
                 for(IPropertyDecorator decorator : PropertyDecoratorRegistry.getAllDecorators()) {
-                    boolean shouldAdd = false;
-                    
-                    if(decorator instanceof IterationPropertyDecorator) {
-                        shouldAdd = isView;
-                    }
-                    else if(decorator instanceof LevelingPropertyDecorator) {
-                        shouldAdd = !isView;
-                    }
-                    
-                    if(!shouldAdd) continue;
-                    
                     String key = decorator.getPropertyKey();
                     boolean alreadyExists = target.getProperties().stream()
                         .anyMatch(p -> key.equals(p.getKey()));
                     if(!alreadyExists) {
                         IProperty newProperty = IArchimateFactory.eINSTANCE.createProperty();
                         newProperty.setKey(key);
-                        newProperty.setValue(""); //$NON-NLS-1$
+                        newProperty.setValue("");
                         target.getProperties().add(newProperty);
                         changed = true;
                     }
@@ -317,9 +283,7 @@ public class UserPropertiesSection extends AbstractECorePropertySection {
                 ((org.eclipse.emf.ecore.EObject)target).eSetDeliver(true);
             }
 
-            if(changed) {
-                fTableViewer.refresh();
-            }
+            if(changed) fTableViewer.refresh();
         }
     }
     
@@ -693,11 +657,7 @@ public class UserPropertiesSection extends AbstractECorePropertySection {
 
             List<String> managedKeys = new ArrayList<>();
             for(IPropertyDecorator decorator : PropertyDecoratorRegistry.getAllDecorators()) {
-                // Only include decorator if appropriate for this element type
                 if(decorator instanceof IterationPropertyDecorator && isView) {
-                    managedKeys.add(decorator.getPropertyKey());
-                }
-                else if(decorator instanceof LevelingPropertyDecorator && !isView) {
                     managedKeys.add(decorator.getPropertyKey());
                 }
             }
@@ -869,11 +829,6 @@ public class UserPropertiesSection extends AbstractECorePropertySection {
                 items = new String[viewNames.length + 1];
                 items[0] = ""; //$NON-NLS-1$
                 System.arraycopy(viewNames, 0, items, 1, viewNames.length);
-            }
-            else if("Model Level".equalsIgnoreCase(property.getKey())) {
-                items = new String[MODEL_LEVEL_VALUES.length + 1];
-                items[0] = ""; //$NON-NLS-1$
-                System.arraycopy(MODEL_LEVEL_VALUES, 0, items, 1, MODEL_LEVEL_VALUES.length);
             }
             else {
                 items = isAlive(getFirstSelectedElement())

@@ -10,7 +10,6 @@ public class PropertyDecoratorRegistry {
     private static final List<IPropertyDecorator> decorators = new ArrayList<>();
 
     static {
-        decorators.add(new LevelingPropertyDecorator());
         decorators.add(new IterationPropertyDecorator(IterationPropertyDecorator.PROPERTY_PREVIOUS_ITERATION));
         decorators.add(new IterationPropertyDecorator(IterationPropertyDecorator.PROPERTY_NEXT_ITERATION));
         decorators.add(new IterationPropertyDecorator(IterationPropertyDecorator.PROPERTY_PREVIOUS_VERSION));
