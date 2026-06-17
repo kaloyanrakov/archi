@@ -1,11 +1,9 @@
 package com.archimatetool.editor.tools;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.eclipse.emf.ecore.util.EcoreUtil;
 import org.eclipse.gef.commands.Command;
 import org.eclipse.jface.dialogs.Dialog;
 import org.eclipse.jface.viewers.ArrayContentProvider;
@@ -20,7 +18,6 @@ import org.eclipse.swt.widgets.Label;
 import org.eclipse.swt.widgets.Shell;
 
 import com.archimatetool.model.IArchimateFactory;
-import com.archimatetool.model.IArchimateModel;
 import com.archimatetool.model.IArchimateDiagramModel;
 import com.archimatetool.model.IDiagramModel;
 import com.archimatetool.model.IDiagramModelArchimateObject;
@@ -139,7 +136,7 @@ public class GenerateDiffViewCommand extends Command {
         for(IDiagramModelArchimateObject dmo : newRootDmos) {
             IDiagramModelArchimateObject copy = copyDmo(dmo,
                 PADDING + col * CELL_W, finalMaxY + row * CELL_H);
-            copy.setFillColor("#CCFFCC"); //$NON-NLS-1$
+            copy.setFillColor(darkenColor(dmo));   // in addNewElementsFromViewB
             diffView.getChildren().add(copy);
             srcToCopyB.put(dmo, copy);
             if(++col >= COLS) { col = 0; row++; }
@@ -198,6 +195,43 @@ public class GenerateDiffViewCommand extends Command {
             }
         }
         return maxY;
+    }
+    private String lightenColor(IDiagramModelArchimateObject dmo) {
+        String hexColor = dmo.getFillColor();
+        if(hexColor == null) {
+            org.eclipse.swt.graphics.Color color =
+                com.archimatetool.editor.ui.ColorFactory.getDefaultFillColor(dmo.getArchimateElement());
+            if(color != null) hexColor = String.format("#%02X%02X%02X", color.getRed(), color.getGreen(), color.getBlue()); //$NON-NLS-1$
+        }
+        if(hexColor == null) return null;
+        try {
+            int r = Integer.parseInt(hexColor.substring(1, 3), 16);
+            int g = Integer.parseInt(hexColor.substring(3, 5), 16);
+            int b = Integer.parseInt(hexColor.substring(5, 7), 16);
+            r = r + (int)((255 - r) * 0.65);
+            g = g + (int)((255 - g) * 0.65);
+            b = b + (int)((255 - b) * 0.65);
+            return String.format("#%02X%02X%02X", r, g, b); //$NON-NLS-1$
+        } catch(Exception e) { return null; }
+    }
+
+    private String darkenColor(IDiagramModelArchimateObject dmo) {
+        String hexColor = dmo.getFillColor();
+        if(hexColor == null) {
+            org.eclipse.swt.graphics.Color color =
+                com.archimatetool.editor.ui.ColorFactory.getDefaultFillColor(dmo.getArchimateElement());
+            if(color != null) hexColor = String.format("#%02X%02X%02X", color.getRed(), color.getGreen(), color.getBlue()); //$NON-NLS-1$
+        }
+        if(hexColor == null) return null;
+        try {
+            int r = Integer.parseInt(hexColor.substring(1, 3), 16);
+            int g = Integer.parseInt(hexColor.substring(3, 5), 16);
+            int b = Integer.parseInt(hexColor.substring(5, 7), 16);
+            r = (int)(r * 0.8);
+            g = (int)(g * 0.8);
+            b = (int)(b * 0.8);
+            return String.format("#%02X%02X%02X", r, g, b); //$NON-NLS-1$
+        } catch(Exception e) { return null; }
     }
 
 
@@ -277,7 +311,8 @@ public class GenerateDiffViewCommand extends Command {
                     int x = PADDING + gc[0] * CELL_W;
                     int y = gc[2] + gc[1] * CELL_H;
                     IDiagramModelArchimateObject copy = copyDmo(dmo, x, y);
-                    copy.setFillColor("#CCFFCC"); //$NON-NLS-1$
+                    copy.setFillColor(darkenColor(dmo));   // in addNewElementsFromViewB
+
                     destContainer.getChildren().add(copy);
                     srcToCopyB.put(dmo, copy);
                     if(++gc[0] >= COLS) { gc[0] = 0; gc[1]++; }
@@ -312,7 +347,7 @@ public class GenerateDiffViewCommand extends Command {
                 IDiagramModelArchimateObject copy = copyDmo(dmo, dmo.getBounds().getX(), dmo.getBounds().getY());
                 IArchimateElement el = dmo.getArchimateElement();
                 if(el != null && !targetElems.containsKey(el.getId())) {
-                    copy.setFillColor("#FFCCCC"); //$NON-NLS-1$
+                	copy.setFillColor(lightenColor(dmo));
                 }
                 destContainer.getChildren().add(copy);
                 srcToCopy.put(dmo, copy);

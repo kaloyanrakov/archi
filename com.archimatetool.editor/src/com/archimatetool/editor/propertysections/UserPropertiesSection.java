@@ -865,10 +865,15 @@ public class UserPropertiesSection extends AbstractECorePropertySection {
             String[] items;
             
             if(isIterationProperty(property.getKey())) {
-                items = getAllViewNamesForModel();
+                String[] viewNames = getAllViewNamesForModel();
+                items = new String[viewNames.length + 1];
+                items[0] = ""; //$NON-NLS-1$
+                System.arraycopy(viewNames, 0, items, 1, viewNames.length);
             }
             else if("Model Level".equalsIgnoreCase(property.getKey())) {
-                items = MODEL_LEVEL_VALUES;
+                items = new String[MODEL_LEVEL_VALUES.length + 1];
+                items[0] = ""; //$NON-NLS-1$
+                System.arraycopy(MODEL_LEVEL_VALUES, 0, items, 1, MODEL_LEVEL_VALUES.length);
             }
             else {
                 items = isAlive(getFirstSelectedElement())
