@@ -14,7 +14,6 @@ import org.eclipse.swt.SWT;
 import org.eclipse.swt.graphics.Color;
 import org.eclipse.swt.graphics.Path;
 
-import com.archimatetool.editor.diagram.figures.FigureUtils;
 import com.archimatetool.editor.diagram.figures.ToolTipFigure;
 import com.archimatetool.editor.ui.ArchiLabelProvider;
 import com.archimatetool.editor.ui.IIconDelegate;
@@ -51,13 +50,7 @@ public class AccessConnectionFigure extends AbstractArchimateConnectionFigure {
     @Override
     protected void setFigureProperties() {
         setLineStyle(SWT.LINE_CUSTOM); // We have to explitly set this otherwise dashes/dots don't show
-        setLineDash(getLineDashFloats());
-    }
-    
-    @Override
-    protected float[] getLineDashFloats() {
-        double scale = Math.min(FigureUtils.getFigureScale(this), 1.0); // only scale below 1.0
-        return new float[] { (float)(2 * scale) };
+        setLineDash(new float[] { 2 });
     }
     
     @Override

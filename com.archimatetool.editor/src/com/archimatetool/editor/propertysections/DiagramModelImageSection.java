@@ -21,7 +21,7 @@ import com.archimatetool.model.IDiagramModelImage;
  */
 public class DiagramModelImageSection extends ImageChooserSection {
     
-    private PropertySectionTextControl fTextDocumentation;
+    private MarkdownControl documentationMarkdownControl;
 
     /**
      * Filter to show or reject this section depending on input value
@@ -38,10 +38,15 @@ public class DiagramModelImageSection extends ImageChooserSection {
         }
     }
 
+    /**
+     * Singleton Filter instance
+     */
+    private static final Filter FILTER = new Filter();
+    
     @Override
     protected void createControls(Composite parent) {
         createImageButton(parent);
-        fTextDocumentation = createDocumentationControl(parent, Messages.AbstractNameDocumentationSection_1);
+        documentationMarkdownControl = createDocumentationMarkdownControl(parent, Messages.AbstractNameDocumentationSection_1);
         
         // Help
         PlatformUI.getWorkbench().getHelpSystem().setHelp(parent, HELP_ID);
@@ -49,7 +54,7 @@ public class DiagramModelImageSection extends ImageChooserSection {
     
     @Override
     protected IObjectFilter getFilter() {
-        return new Filter();
+        return FILTER;
     }
 
     @Override
@@ -63,8 +68,7 @@ public class DiagramModelImageSection extends ImageChooserSection {
             return; 
         }
         
-        fTextDocumentation.refresh(getFirstSelectedObject());
-        fTextDocumentation.setEditable(!isLocked(getFirstSelectedObject()));
+        documentationMarkdownControl.update();
     }
     
     @Override
@@ -83,5 +87,4 @@ public class DiagramModelImageSection extends ImageChooserSection {
     public boolean shouldUseExtraSpace() {
         return true;
     }
-
 }

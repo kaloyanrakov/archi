@@ -16,6 +16,7 @@ jobs:
       with:
         ref: integration-build
         submodules: 'true'
+        fetch-depth: 0
     
     - name: Set up Java
       uses: actions/setup-java@v5
@@ -27,11 +28,11 @@ jobs:
     - name: Set up Maven
       uses: stCarolas/setup-maven@v5.1
       with:
-        maven-version: 3.9.12
+        maven-version: 3.9.16
         
     - name: Run tests and build product
       run: |
-        xvfb-run mvn -V clean verify -P tests,product
+        xvfb-run mvn -V clean verify -P tests,product -U
 
     - name: Today's date
       run: |

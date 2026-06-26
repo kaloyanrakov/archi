@@ -84,10 +84,12 @@ implements IDiagramModelObjectFigure {
         return diagramModelObject;
     }
     
+    @Override
     public IFigureDelegate getFigureDelegate() {
         return figureDelegate;
     }
     
+    @Override
     public void setFigureDelegate(IFigureDelegate figureDelegate) {
         this.figureDelegate = figureDelegate;
     }
@@ -154,25 +156,30 @@ implements IDiagramModelObjectFigure {
     }
     
     /**
-     * Set the line width and compensate the figure bounds width and height for this line width and translate the graphics instance
+     * Set the line width and compensate the figure bounds width and height for the line width and translate the graphics instance
      * @param graphics The graphics instance
      * @param lineWidth The line width
-     * @param bounds The bounds of the object
+     * @param figureBounds The bounds of the figure
      */
-    protected void setLineWidth(Graphics graphics, int lineWidth, Rectangle bounds) {
+    protected void setLineWidth(Graphics graphics, int lineWidth, Rectangle figureBounds) {
         graphics.setLineWidth(lineWidth);
         
-        final double scale = FigureUtils.getGraphicsScale(graphics);
+        // Sanity check in case we have a bounds that is too small to be reduced
+        if(figureBounds.width < 5 || figureBounds.height < 5) {
+            return;
+        }
+
+        final double scale = FigureUtils.getFigureScale(this);
         
-        // If line width is 1 and scale is 100% and don't use offset then do nothing
+        // If line width is 1 and scale is 100% and don't use line offset then don't apply an offset
+        // useLineOffset is false if Mac/Linux or user set preference off on Windows
+        // Typically we want it on for Windows where display scaling > 100%
         if(lineWidth == 1 && scale == 1.0 && !useLineOffset) {
             return;
         }
     
-        // Width and height reduced by line width to compensate for x,y offset
-        if(bounds.width > lineWidth && bounds.height > lineWidth) { // but only if width and height are greater than linewidth
-            bounds.resize(-lineWidth, -lineWidth);
-        }
+        // Width and height reduced by line width
+        figureBounds.resize(-lineWidth, -lineWidth);
         
         // x,y offset is half of line width
         float offset = (float)lineWidth / 2;
@@ -186,15 +193,6 @@ implements IDiagramModelObjectFigure {
     }
     
     /**
-     * Set the drawing state when disabled
-     * @param graphics
-     */
-    protected void setDisabledState(Graphics graphics) {
-        //graphics.setLineStyle(SWT.LINE_DASH);
-        //graphics.setLineDash(new int[] { 4, 3 });
-    }
-    
-    /**
      * Set the line style
      * @param graphics
      */
@@ -204,12 +202,10 @@ implements IDiagramModelObjectFigure {
                 graphics.setLineStyle(Graphics.LINE_SOLID);
             }
             case IDiagramModelObject.LINE_STYLE_DASHED -> {
-                final double scale = Math.min(FigureUtils.getFigureScale(this), 1.0); // only scale below 1.0
-                graphics.setLineDash(new float[] { (float)(8 * scale), (float)(4 * scale) });
+                graphics.setLineDash(new float[] { 8, 4 });
             }
             case IDiagramModelObject.LINE_STYLE_DOTTED -> {
-                final double scale = Math.min(FigureUtils.getFigureScale(this), 1.0); // only scale below 1.0
-                graphics.setLineDash(new float[] { (float)(2 * scale), (float)(4 * scale) });
+                graphics.setLineDash(new float[] { 2, 4 });
             }
         }
     }

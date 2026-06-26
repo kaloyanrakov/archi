@@ -130,6 +130,11 @@ public class UserPropertiesSection extends AbstractECorePropertySection {
         }
     }
 
+    /**
+     * Singleton Filter instance
+     */
+    private static final Filter FILTER = new Filter();
+    
     // Selected properties elements
     private List<IProperties> fPropertiesElements = new ArrayList<>();
 
@@ -263,7 +268,7 @@ public class UserPropertiesSection extends AbstractECorePropertySection {
 
     @Override
     protected IObjectFilter getFilter() {
-        return new Filter();
+        return FILTER;
     }
     
     @Override
@@ -401,16 +406,15 @@ public class UserPropertiesSection extends AbstractECorePropertySection {
         fActionShowKeyEditor = new ShowKeyEditorAction();
 
         // Toolbar
-        ToolBar toolBar = new ToolBar(parent, SWT.FLAT | SWT.VERTICAL);
+        ToolBarManager toolbarManager = new ToolBarManager(SWT.FLAT | SWT.VERTICAL | SWT.NO_FOCUS);
+        toolbarManager.add(fActionNewProperty);
+        toolbarManager.add(fActionNewMultipleProperties);
+        toolbarManager.add(fActionRemoveProperties);
+        toolbarManager.add(fActionShowKeyEditor);
+        
+        ToolBar toolBar = toolbarManager.createControl(parent);
         getWidgetFactory().adapt(toolBar);
         GridDataFactory.fillDefaults().align(SWT.END, SWT.TOP).applyTo(toolBar);
-
-        ToolBarManager toolBarmanager = new ToolBarManager(toolBar);
-        toolBarmanager.add(fActionNewProperty);
-        toolBarmanager.add(fActionNewMultipleProperties);
-        toolBarmanager.add(fActionRemoveProperties);
-        toolBarmanager.add(fActionShowKeyEditor);
-        toolBarmanager.update(true);
 
         // Hook into the context menu
         MenuManager menuMgr = new MenuManager("#PropertiesPopupMenu"); //$NON-NLS-1$

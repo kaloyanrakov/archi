@@ -155,10 +155,13 @@ public interface IArchiImages {
     String ICON_DERIVED = IMGPATH + "derived.png";
     String ICON_DERIVED_SM = IMGPATH + "derived-sm.png";
     String ICON_EXPANDALL = IMGPATH + "expandall.png";
+    String ICON_EDIT = IMGPATH + "edit.png";
     String ICON_FILTER = IMGPATH + "filter.png";
     String ICON_FONT = IMGPATH + "font.png";
     String ICON_FORMAT_PAINTER = IMGPATH + "formatpainter.png";
+    String ICON_FORMAT_PAINTER24 = IMGPATH + "formatpainter24.png";
     String ICON_FORMAT_PAINTER_GREY = IMGPATH + "formatpainter-grey.png";
+    String ICON_FORMAT_PAINTER_GREY24 = IMGPATH + "formatpainter-grey24.png";
     String ICON_GROUP = IMGPATH + "group.png";
     String ICON_LINKED = IMGPATH + "linked.png";
     String ICON_LANDSCAPE = IMGPATH + "landscape.png";
@@ -176,6 +179,7 @@ public interface IArchiImages {
     String ICON_OPEN = IMGPATH + "open.png";
     String ICON_PIN = IMGPATH + "pin.png";
     String ICON_PLUS = IMGPATH + "plus.png";
+    String ICON_PREVIEW = IMGPATH + "preview.png";
     String ICON_SEARCH = IMGPATH + "search.png";
     String ICON_SEARCH_LIGHT = IMGPATH + "search_light.png";
     String ICON_SKETCH = IMGPATH + "sketch.png";

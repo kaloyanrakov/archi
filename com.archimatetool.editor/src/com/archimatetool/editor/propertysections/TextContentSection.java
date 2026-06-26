@@ -45,6 +45,10 @@ public class TextContentSection extends AbstractECorePropertySection {
         }
     }
 
+    /**
+     * Singleton Filter instance
+     */
+    private static final Filter FILTER = new Filter();
     
     private PropertySectionTextControl fTextContentControl;
     
@@ -52,12 +56,12 @@ public class TextContentSection extends AbstractECorePropertySection {
     protected void createControls(Composite parent) {
         createLabel(parent, Messages.TextContentSection_0, ITabbedLayoutConstants.STANDARD_LABEL_WIDTH, SWT.NONE);
         
-        StyledTextControl styledTextControl = createStyledTextControl(parent, SWT.NONE);
+        StyledTextControl styledTextControl = createStyledTextControl(parent, SWT.BORDER);
         styledTextControl.setMessage(Messages.TextContentSection_2);
+        fTextContentControl = new PropertySectionTextControl(styledTextControl.getControl(), IArchimatePackage.Literals.TEXT_CONTENT__CONTENT);
         
-        fTextContentControl = new PropertySectionTextControl(styledTextControl.getControl(), IArchimatePackage.Literals.TEXT_CONTENT__CONTENT) {
-            @Override
-            protected void textChanged(String oldText, String newText) {
+        fTextContentControl.setOnTextChanged((oldText, newText) -> {
+            if(getEObjects() != null) {
                 CompoundCommand result = new CompoundCommand();
                 
                 for(EObject textContent : getEObjects()) {
@@ -72,7 +76,7 @@ public class TextContentSection extends AbstractECorePropertySection {
 
                 executeCommand(result.unwrap());
             }
-        };
+        });
         
         // Help
         PlatformUI.getWorkbench().getHelpSystem().setHelp(fTextContentControl.getTextControl(), HELP_ID);
@@ -101,7 +105,7 @@ public class TextContentSection extends AbstractECorePropertySection {
     
     @Override
     protected IObjectFilter getFilter() {
-        return new Filter();
+        return FILTER;
     }
 
     @Override

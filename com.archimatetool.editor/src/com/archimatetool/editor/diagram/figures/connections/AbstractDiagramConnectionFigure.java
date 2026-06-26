@@ -5,8 +5,6 @@
  */
 package com.archimatetool.editor.diagram.figures.connections;
 
-import java.util.Arrays;
-
 import org.eclipse.draw2d.ColorConstants;
 import org.eclipse.draw2d.ConnectionLocator;
 import org.eclipse.draw2d.Graphics;
@@ -35,6 +33,7 @@ import com.archimatetool.model.IDiagramModelConnection;
  * Abstract implementation of a connection figure.  Subclasses should decide how to draw the line
  * 
  * @author Phillip Beauvoir
+ * @author jbsarrodie
  */
 public abstract class AbstractDiagramConnectionFigure
 extends RoundedPolylineConnection implements IDiagramConnectionFigure {
@@ -43,6 +42,7 @@ extends RoundedPolylineConnection implements IDiagramConnectionFigure {
     private IDiagramModelConnection diagramModelConnection;
 
     protected int fTextPosition = -1;
+    protected int fTextRelativePosition = -1;
     protected Color fFontColor;
     protected Color fLineColor;
     
@@ -71,10 +71,11 @@ extends RoundedPolylineConnection implements IDiagramConnectionFigure {
 
     @Override
     public void refreshVisuals() {
-        // If the text position has been changed by user update it
-        if(getModelConnection().getTextPosition() != fTextPosition) {
+        // If the text position has been changed update it
+        if(getModelConnection().getTextPosition() != fTextPosition || getModelConnection().getRelativePosition() != fTextRelativePosition) {
             fTextPosition = getModelConnection().getTextPosition();
-            setLabelLocator(fTextPosition);
+            fTextRelativePosition = getModelConnection().getRelativePosition();
+            setLabelLocator();
         }
         
         setLabelFont();
@@ -126,21 +127,22 @@ extends RoundedPolylineConnection implements IDiagramConnectionFigure {
         getFlowPage().setHorizontalAligment(alignment);
     }
 
-    private void setLabelLocator(int position) {
-        Locator locator = null;
+    private void setLabelLocator() {
+        Locator locator = switch (getModelConnection().getTextPosition()) {
+            case IDiagramModelConnection.CONNECTION_TEXT_POSITION_SOURCE ->
+                new ArchiConnectionEndpointLocator(this, false);
 
-        switch(position) {
-            case IDiagramModelConnection.CONNECTION_TEXT_POSITION_SOURCE:
-                locator = new ArchiConnectionEndpointLocator(this, false);
-                break;
-            case IDiagramModelConnection.CONNECTION_TEXT_POSITION_MIDDLE:
-                locator = new ConnectionLocator(this, ConnectionLocator.MIDDLE);
-                break;
-            case IDiagramModelConnection.CONNECTION_TEXT_POSITION_TARGET:
-                locator = new ArchiConnectionEndpointLocator(this, true);
-                break;
-        }
-        
+            case IDiagramModelConnection.CONNECTION_TEXT_POSITION_TARGET ->
+                new ArchiConnectionEndpointLocator(this, true);
+
+            default -> {
+                ConnectionLocator cl = new ConnectionLocator(this, ConnectionLocator.MIDDLE);
+                cl.setRelativePosition(getModelConnection().getRelativePosition());
+                cl.setGap(5); // Add some clearance if not centre
+                yield cl;
+            }
+        };
+
         setConstraint(getFlowPage(), locator);
     }
     
@@ -214,30 +216,6 @@ extends RoundedPolylineConnection implements IDiagramConnectionFigure {
         return super.getToolTip();
     }
     
-    /**
-     * This is called when the parent scale is changed and set
-     * in the figure's ancestor ScalableFreeformLayeredPane#setScale()
-     * So we set the line dash information based on the current scale
-     */
-    @Override
-    protected void fireFigureMoved() {
-        // Get the connection's line dash information
-        float[] ld = getLineDashFloats();
-        // If we have some and there has been a change (i.e the scale has changed) then set the line dash to the new information
-        if(ld != null && !Arrays.equals(ld, getLineDash())) { 
-            setLineDash(ld);
-        }
-        
-        super.fireFigureMoved();
-    }
-    
-    /**
-     * @return line dash float information for connections with lines dashes, or null if the connection has no line dashes
-     */
-    protected float[] getLineDashFloats() {
-        return null;
-    }
-    
     @Override
     public void setSelected(boolean selected) {
         isSelected = selected;
@@ -245,7 +223,10 @@ extends RoundedPolylineConnection implements IDiagramConnectionFigure {
     
     @Override
     public void showTargetFeedback(boolean show) {
-        showTargetFeedback = show;
+        if(showTargetFeedback != show) {
+            showTargetFeedback = show;
+            repaint();
+        }
     }
 
     @Override
@@ -259,49 +240,51 @@ extends RoundedPolylineConnection implements IDiagramConnectionFigure {
             setForegroundColor(fLineColor);
         }
 
-        // Label strategy
+        // Label strategy is clipped
         if(StringUtils.isSet(getConnectionLabel().getText()) && 
-                ArchiPlugin.getInstance().getPreferenceStore().getInt(IPreferenceConstants.CONNECTION_LABEL_STRATEGY) == CONNECTION_LABEL_CLIPPED) {
+                                         ArchiPlugin.getInstance().getPreferenceStore().getInt(IPreferenceConstants.CONNECTION_LABEL_STRATEGY) == CONNECTION_LABEL_CLIPPED) {
             clipTextLabel(graphics);
         }
-        else {
-            super.paintFigure(graphics);
-        }
+        
+        super.paintFigure(graphics);
     }
     
     /**
-     * Clip the text label so it doesn't draw on the connection
+     * Create a clip Path so that the text label doesn't draw over the connection
      */
-    protected void clipTextLabel(Graphics graphics) {
-        // Margin around label
-        final int labelMargin = 1;
+    private void clipTextLabel(Graphics graphics) {
+        // Clipping area of connection figure (the visible part of the connection figure's bounds)
+        Rectangle clipRect = graphics.getClip(Rectangle.SINGLETON);
         
-        // Save dimensions of original clipping area and label
-        Rectangle g = graphics.getClip(new Rectangle());
-        Rectangle l = getFlowPage().getBounds().getCopy();
+        // The label's flow page bounds
+        Rectangle labelRect = getFlowPage().getBounds().getCopy();
         
-        // Label margin
-        l.expand(labelMargin, labelMargin);
+        // Expand label margin's horizontal width
+        labelRect.expand(1, 0);
         
         // Create a Path that fills the clipping area minus the label
         Path path = new Path(null);
         
-        path.moveTo(g.x, g.y);
-        path.lineTo(l.x, l.y);
-        path.lineTo(l.x + l.width, l.y);
-        path.lineTo(l.x + l.width, l.y + l.height);
-        path.lineTo(l.x, l.y + l.height);
-        path.lineTo(l.x, l.y);
-        path.lineTo(g.x, g.y);
-        path.lineTo(g.x, g.y + g.height);
-        path.lineTo(g.x + g.width, g.y + g.height);
-        path.lineTo(g.x + g.width, g.y);
-        path.lineTo(g.x, g.y);
+        // Move to clip rect's start x,y
+        path.moveTo(clipRect.x, clipRect.y);
         
+        // Draw path of label
+        drawRectPath(path, labelRect);
+        
+        // Draw path of clip area 
+        drawRectPath(path, clipRect);
+        
+        // Clip the path
         graphics.clipPath(path);
         
-        super.paintFigure(graphics);
-        
         path.dispose();
+    }
+    
+    private void drawRectPath(Path path, Rectangle rect) {
+        path.lineTo(rect.x, rect.y);
+        path.lineTo(rect.x + rect.width, rect.y);
+        path.lineTo(rect.x + rect.width, rect.y + rect.height);
+        path.lineTo(rect.x, rect.y + rect.height);
+        path.lineTo(rect.x, rect.y);
     }
 }

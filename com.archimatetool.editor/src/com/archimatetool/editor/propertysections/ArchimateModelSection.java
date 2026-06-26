@@ -8,7 +8,6 @@ package com.archimatetool.editor.propertysections;
 import java.io.File;
 
 import org.eclipse.emf.common.notify.Notification;
-import org.eclipse.emf.ecore.EObject;
 import org.eclipse.gef.commands.Command;
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.widgets.Composite;
@@ -46,9 +45,14 @@ public class ArchimateModelSection extends AbstractECorePropertySection {
         }
     }
 
+    /**
+     * Singleton Filter instance
+     */
+    private static final Filter FILTER = new Filter();
+    
     private PropertySectionTextControl fTextName;
     private Text fTextFile;
-    private PropertySectionTextControl fTextPurpose;
+    private MarkdownControl purposeMarkdownControl;
     
     @Override
     protected void createControls(Composite parent) {
@@ -73,23 +77,24 @@ public class ArchimateModelSection extends AbstractECorePropertySection {
         createLabel(parent, Messages.ArchimateModelSection_2, STANDARD_LABEL_WIDTH, SWT.NONE);
 
         // Text
-        StyledTextControl styledTextControl = createStyledTextControl(parent, SWT.NONE);
-        styledTextControl.setMessage(Messages.ArchimateModelSection_4);
-        
-        fTextPurpose = new PropertySectionTextControl(styledTextControl.getControl(), IArchimatePackage.Literals.ARCHIMATE_MODEL__PURPOSE) {
-            @Override
-            protected void textChanged(String oldText, String newText) {
-                EObject model = getFirstSelectedObject();
-
-                if(isAlive(model)) {
-                    Command cmd = new EObjectFeatureCommand(Messages.ArchimateModelSection_3, getFirstSelectedObject(),
-                            IArchimatePackage.Literals.ARCHIMATE_MODEL__PURPOSE, newText);
+        purposeMarkdownControl = new MarkdownControl(parent, this);
+        purposeMarkdownControl.setPropertySectionTextControl(markdownParent -> {
+            StyledTextControl styledTextControl = createStyledTextControl(markdownParent, SWT.NONE, true);
+            styledTextControl.setMessage(Messages.ArchimateModelSection_4);
+            PropertySectionTextControl textControl = new PropertySectionTextControl(styledTextControl.getControl(), IArchimatePackage.Literals.ARCHIMATE_MODEL__PURPOSE);
+            
+            textControl.setOnTextChanged((oldText, newText) -> {
+                if(getFirstSelectedObject() instanceof IArchimateModel model && isAlive(model)) {
+                    Command cmd = new EObjectFeatureCommand(Messages.ArchimateModelSection_3, model,
+                                                            IArchimatePackage.Literals.ARCHIMATE_MODEL__PURPOSE, newText);
                     if(cmd.canExecute()) {
                         executeCommand(cmd);
                     }
                 }
-            }
-        };
+            });
+            
+            return textControl;
+        });
     }
 
     @Override
@@ -139,12 +144,13 @@ public class ArchimateModelSection extends AbstractECorePropertySection {
         if(isExecutingCommand()) {
             return; 
         }
-        fTextPurpose.refresh(getFirstSelectedObject());
+        
+        purposeMarkdownControl.update();
     }
 
     @Override
     protected IObjectFilter getFilter() {
-        return new Filter();
+        return FILTER;
     }
     
     @Override

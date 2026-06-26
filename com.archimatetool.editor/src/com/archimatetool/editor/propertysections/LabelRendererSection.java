@@ -47,6 +47,11 @@ public class LabelRendererSection extends AbstractECorePropertySection {
         }
     }
 
+    /**
+     * Singleton Filter instance
+     */
+    private static final Filter FILTER = new Filter();
+    
     @Override
     protected void notifyChanged(Notification msg) {
         Object feature = msg.getFeature();
@@ -62,12 +67,12 @@ public class LabelRendererSection extends AbstractECorePropertySection {
     protected void createControls(Composite parent) {
         createLabel(parent, Messages.LabelRendererSection_0, ITabbedLayoutConstants.STANDARD_LABEL_WIDTH, SWT.NONE);
         
-        StyledTextControl styledTextControl = createStyledTextControl(parent, SWT.NONE);
+        StyledTextControl styledTextControl = createStyledTextControl(parent, SWT.BORDER);
         styledTextControl.setMessage(Messages.LabelRendererSection_1);
+        fTextRender = new PropertySectionTextControl(styledTextControl.getControl(), TextRenderer.FEATURE_NAME);
         
-        fTextRender = new PropertySectionTextControl(styledTextControl.getControl(), TextRenderer.FEATURE_NAME) {
-            @Override
-            protected void textChanged(String oldText, String newText) {
+        fTextRender.setOnTextChanged((oldText, newText) -> {
+            if(getEObjects() != null) {
                 CompoundCommand result = new CompoundCommand();
                 
                 for(EObject eObject : getEObjects()) {
@@ -81,7 +86,7 @@ public class LabelRendererSection extends AbstractECorePropertySection {
 
                 executeCommand(result.unwrap());
             }
-        };
+        });
         
         // Help ID
         PlatformUI.getWorkbench().getHelpSystem().setHelp(parent, HELP_ID);
@@ -99,7 +104,7 @@ public class LabelRendererSection extends AbstractECorePropertySection {
     
     @Override
     protected IObjectFilter getFilter() {
-        return new Filter();
+        return FILTER;
     }
     
     @Override
