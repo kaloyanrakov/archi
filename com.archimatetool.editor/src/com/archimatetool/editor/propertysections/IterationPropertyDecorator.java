@@ -34,6 +34,10 @@ public class IterationPropertyDecorator implements IPropertyDecorator {
     public String getPropertyKey() {
         return propertyKey;
     }
+    @Override
+    public boolean appliesTo(IProperties target) {
+        return target instanceof IDiagramModel;
+    }
 
     @Override
     public String[] getRestrictedValues() {

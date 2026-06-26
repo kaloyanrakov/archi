@@ -135,6 +135,7 @@ implements ITreeModelView, IUIRequestListener {
     
     private DrillDownAdapter fDrillDownAdapter;
     
+    private List<IAction> fLevelActions;
     public TreeModelView() {
     }
     
@@ -373,6 +374,7 @@ implements ITreeModelView, IUIRequestListener {
         IHandlerService handlerService = getSite().getService(IHandlerService.class);
         handlerService.activateHandler(IWorkbenchCommandConstants.NAVIGATE_COLLAPSE_ALL, new ActionHandler(fActionCollapseSelected));
         handlerService.activateHandler(IWorkbenchCommandConstants.NAVIGATE_EXPAND_ALL, new ActionHandler(fActionExpandSelected));
+        fLevelActions = buildLevelActions();
     }
     
     /**

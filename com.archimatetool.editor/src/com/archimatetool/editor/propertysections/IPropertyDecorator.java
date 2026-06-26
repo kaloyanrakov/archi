@@ -29,4 +29,6 @@ public interface IPropertyDecorator {
             contributeCommands(ae, newValue, cmd);
         }
     }
+    
+    boolean appliesTo(IProperties target);
 }

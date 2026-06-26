@@ -249,68 +249,9 @@ public class UserPropertiesSection extends AbstractECorePropertySection {
         
         // Locked
         updateLocked();
-        injectMissingProperties();
+        
     }
     
-    private void injectMissingProperties() {
-        if(fPropertiesElements.isEmpty()) return;
-
-        for(IProperties target : fPropertiesElements) {
-            if(!(target instanceof IArchimateElement) && !(target instanceof IDiagramModel)) {
-                continue;
-            }
-
-            boolean isView = target instanceof IDiagramModel;
-            boolean changed = false;
-            ((org.eclipse.emf.ecore.EObject)target).eSetDeliver(false);
-            try {
-            	if(isView) {
-            	    boolean removed = target.getProperties().removeIf(p -> "Model Level".equals(p.getKey()));
-            	    if(removed) changed = true;
-            	}
-            	else {
-            	    boolean removed = target.getProperties().removeIf(p -> 
-            	        IterationPropertyDecorator.PROPERTY_PREVIOUS_ITERATION.equals(p.getKey()) ||
-            	        IterationPropertyDecorator.PROPERTY_NEXT_ITERATION.equals(p.getKey()) ||
-            	        IterationPropertyDecorator.PROPERTY_PREVIOUS_VERSION.equals(p.getKey()) ||
-            	        IterationPropertyDecorator.PROPERTY_NEXT_VERSION.equals(p.getKey()));
-            	    if(removed) changed = true;
-            	}
-
-                // ADD missing properties
-                for(IPropertyDecorator decorator : PropertyDecoratorRegistry.getAllDecorators()) {
-                    boolean shouldAdd = false;
-                    
-                    if(decorator instanceof IterationPropertyDecorator) {
-                        shouldAdd = isView;
-                    }
-                    else if(decorator instanceof LevelingPropertyDecorator) {
-                        shouldAdd = !isView;
-                    }
-                    
-                    if(!shouldAdd) continue;
-                    
-                    String key = decorator.getPropertyKey();
-                    boolean alreadyExists = target.getProperties().stream()
-                        .anyMatch(p -> key.equals(p.getKey()));
-                    if(!alreadyExists) {
-                        IProperty newProperty = IArchimateFactory.eINSTANCE.createProperty();
-                        newProperty.setKey(key);
-                        newProperty.setValue(""); //$NON-NLS-1$
-                        target.getProperties().add(newProperty);
-                        changed = true;
-                    }
-                }
-            }
-            finally {
-                ((org.eclipse.emf.ecore.EObject)target).eSetDeliver(true);
-            }
-
-            if(changed) {
-                fTableViewer.refresh();
-            }
-        }
-    }
     
     private void updateLocked() {
         boolean locked = isLocked(getFirstSelectedObject());
@@ -677,18 +618,21 @@ public class UserPropertiesSection extends AbstractECorePropertySection {
                 return new Object[0];
             }
 
-            List<IProperty> all = new ArrayList<>(getFirstSelectedElement().getProperties());
-            boolean isView = getFirstSelectedElement() instanceof IDiagramModel;
+            IProperties target = getFirstSelectedElement();
+            List<IProperty> all = new ArrayList<>(target.getProperties());
 
+            // Keys managed by decorators that apply to this target type
             List<String> managedKeys = new ArrayList<>();
             for(IPropertyDecorator decorator : PropertyDecoratorRegistry.getAllDecorators()) {
-                // Only include decorator if appropriate for this element type
-                if(decorator instanceof IterationPropertyDecorator && isView) {
+                if(decorator.appliesTo(target)) {
                     managedKeys.add(decorator.getPropertyKey());
                 }
-                else if(decorator instanceof LevelingPropertyDecorator && !isView) {
-                    managedKeys.add(decorator.getPropertyKey());
-                }
+            }
+
+            // Keys that DON'T apply to this target — filter them out of the display
+            Set<String> allDecoratorKeys = new HashSet<>();
+            for(IPropertyDecorator decorator : PropertyDecoratorRegistry.getAllDecorators()) {
+                allDecoratorKeys.add(decorator.getPropertyKey());
             }
 
             List<IProperty> managed = new ArrayList<>();
@@ -702,9 +646,8 @@ public class UserPropertiesSection extends AbstractECorePropertySection {
             }
 
             for(IProperty p : all) {
-                if(!managedKeys.contains(p.getKey())) {
-                    // Also hide Model Level on views even if it was previously saved
-                    if(isView && "Model Level".equals(p.getKey())) continue;
+                // Only show user properties that aren't managed by any decorator
+                if(!allDecoratorKeys.contains(p.getKey())) {
                     user.add(p);
                 }
             }
@@ -850,26 +793,21 @@ public class UserPropertiesSection extends AbstractECorePropertySection {
 
         @Override
         protected CellEditor getCellEditor(Object element) {
-            IProperty property = (IProperty)element;
+            IProperty property = (IProperty) element;
             String[] items;
-            
-            if(isIterationProperty(property.getKey())) {
-                String[] viewNames = getAllViewNamesForModel();
-                items = new String[viewNames.length + 1];
-                items[0] = ""; //$NON-NLS-1$
-                System.arraycopy(viewNames, 0, items, 1, viewNames.length);
-            }
-            else if("Model Level".equalsIgnoreCase(property.getKey())) {
-                items = new String[MODEL_LEVEL_VALUES.length + 1];
-                items[0] = ""; //$NON-NLS-1$
-                System.arraycopy(MODEL_LEVEL_VALUES, 0, items, 1, MODEL_LEVEL_VALUES.length);
+
+            IPropertyDecorator decorator = PropertyDecoratorRegistry.getDecorator(property.getKey());
+
+            if(decorator != null && decorator.getRestrictedValues(getFirstSelectedElement()).length > 0) {
+                // Decorator owns its dropdown values — iteration views, model levels, etc.
+                items = decorator.getRestrictedValues(getFirstSelectedElement());
             }
             else {
                 items = isAlive(getFirstSelectedElement())
                     ? getAllUniquePropertyValuesForKeyForModel(property.getKey(), MAX_ITEMS_COMBO)
                     : new String[0];
             }
-            
+
             cellEditor.setItems(items);
             cellEditor.setEditable(!isReadOnlyProperty(property.getKey()));
             return cellEditor;

@@ -12,7 +12,7 @@ import com.archimatetool.model.IArchimateFactory;
 import com.archimatetool.model.IArchimateModel;
 import com.archimatetool.model.IDiagramModelArchimateObject;
 import com.archimatetool.model.IFolder;
-
+import com.archimatetool.model.IArchimatePackage;
 
 public class LevelingPropertyDecorator implements IPropertyDecorator {
 
@@ -42,6 +42,11 @@ public class LevelingPropertyDecorator implements IPropertyDecorator {
     @Override
     public String getPropertyKey() {
         return PROPERTY_MODEL_LEVEL;
+    }
+    
+    @Override
+    public boolean appliesTo(IProperties target) {
+        return target instanceof IArchimateElement;
     }
 
     @Override
