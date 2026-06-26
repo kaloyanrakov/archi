@@ -1,5 +1,7 @@
 package com.archimatetool.editor.propertysections;
 
+import java.util.Set;
+
 import org.eclipse.gef.commands.Command;
 import org.eclipse.gef.commands.CompoundCommand;
 
@@ -11,15 +13,35 @@ import com.archimatetool.model.IArchimateModel;
 import com.archimatetool.model.IDiagramModelArchimateObject;
 import com.archimatetool.model.IFolder;
 
+
 public class LevelingPropertyDecorator implements IPropertyDecorator {
 
-    private static final String PROPERTY_KEY = "Model Level"; //$NON-NLS-1$
+    // Public — single source of truth for the key name
+    public static final String PROPERTY_MODEL_LEVEL = "Model Level"; //$NON-NLS-1$
+
+    // Public — UserPropertiesSection references this for the dropdown
+    public static final String[] MODEL_LEVEL_VALUES = {
+        "Level 1", //$NON-NLS-1$
+        "Level 2", //$NON-NLS-1$
+        "Level 3"  //$NON-NLS-1$
+    };
+
+    // Public — UserPropertiesSection uses this in READ_ONLY_KEYS
+    public static final Set<String> MODEL_LEVEL_KEYS = Set.of(PROPERTY_MODEL_LEVEL);
+
+    // Private — the empty string prefix is a UI concern, not exposed
+    private static final String[] RESTRICTED_VALUES;
+    static {
+        RESTRICTED_VALUES = new String[MODEL_LEVEL_VALUES.length + 1];
+        RESTRICTED_VALUES[0] = ""; //$NON-NLS-1$
+        System.arraycopy(MODEL_LEVEL_VALUES, 0, RESTRICTED_VALUES, 1, MODEL_LEVEL_VALUES.length);
+    }
+
     private static final String LABEL_EXPRESSION = "${property:Model Level} ${name}"; //$NON-NLS-1$
-    private static final String[] RESTRICTED_VALUES = {"", "L1", "L2", "L3"}; //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$ //$NON-NLS-4$
 
     @Override
     public String getPropertyKey() {
-        return PROPERTY_KEY;
+        return PROPERTY_MODEL_LEVEL;
     }
 
     @Override

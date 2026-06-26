@@ -9,14 +9,20 @@ import com.archimatetool.model.IArchimateFactory;
 import com.archimatetool.model.IProperties;
 import com.archimatetool.model.IProperty;
 import java.util.Set;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 public class IterationPropertyDecorator implements IPropertyDecorator {
 
     public static final String PROPERTY_PREVIOUS_ITERATION = "Previous Iteration"; //$NON-NLS-1$
     public static final String PROPERTY_NEXT_ITERATION = "Next Iteration"; //$NON-NLS-1$
     
-    public static final String PROPERTY_NEXT_VERSION = "Next Version";
-    public static final String PROPERTY_PREVIOUS_VERSION = "Previous Version";
+    public static final String PROPERTY_NEXT_VERSION = "Next Version";//$NON-NLS-1$
+    public static final String PROPERTY_PREVIOUS_VERSION = "Previous Version";//$NON-NLS-1$
 
     private final String propertyKey;
 
@@ -239,18 +245,27 @@ public class IterationPropertyDecorator implements IPropertyDecorator {
             .orElse(null);
     }
 
+    public static final Set<String> VIEW_LINK_KEYS = Set.of(
+            PROPERTY_NEXT_ITERATION,
+            PROPERTY_PREVIOUS_ITERATION,
+            PROPERTY_NEXT_VERSION,
+            PROPERTY_PREVIOUS_VERSION
+        );
     
-    public static java.util.Map<String, IDiagramModel> getIterationLinks(IDiagramModel diagram) {
-        java.util.Map<String, IDiagramModel> links = new java.util.LinkedHashMap<>();
-        for(com.archimatetool.model.IProperty p : diagram.getProperties()) {
-            if((PROPERTY_NEXT_ITERATION.equals(p.getKey()) 
-                    || PROPERTY_PREVIOUS_ITERATION.equals(p.getKey())
-                    || PROPERTY_NEXT_VERSION.equals(p.getKey())       
-                    || PROPERTY_PREVIOUS_VERSION.equals(p.getKey()))
-                    && p.getValue() != null && !p.getValue().isBlank()) {
-                links.put(p.getKey(), resolveIterationTarget(diagram, p.getValue()));
+    public static Map<String, IDiagramModel> getIterationLinks(IDiagramModel diagram) {
+        Map<String, IDiagramModel> links = new LinkedHashMap<>();
+
+        for(IProperty p : diagram.getProperties()) {
+            if(VIEW_LINK_KEYS.contains(p.getKey())
+                    && p.getValue() != null
+                    && !p.getValue().isBlank()) {
+                IDiagramModel target = resolveIterationTarget(diagram, p.getValue());
+                if(target != null) {
+                    links.put(p.getKey(), target);
+                }
             }
         }
+
         return links;
     }
     
