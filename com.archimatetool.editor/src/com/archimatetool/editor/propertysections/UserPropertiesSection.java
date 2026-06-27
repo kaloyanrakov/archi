@@ -633,7 +633,7 @@ public class UserPropertiesSection extends AbstractECorePropertySection {
                 }
             }
 
-            // Keys that DON'T apply to this target — filter them out of the display
+            // Keys owned by ANY decorator — used to filter user properties
             Set<String> allDecoratorKeys = new HashSet<>();
             for(IPropertyDecorator decorator : PropertyDecoratorRegistry.getAllDecorators()) {
                 allDecoratorKeys.add(decorator.getPropertyKey());
@@ -643,14 +643,25 @@ public class UserPropertiesSection extends AbstractECorePropertySection {
             List<IProperty> user    = new ArrayList<>();
 
             for(String key : managedKeys) {
-                all.stream()
+                // Find existing property on the model, or synthesize a display-only placeholder
+                IProperty existing = all.stream()
                     .filter(p -> key.equals(p.getKey()))
                     .findFirst()
-                    .ifPresent(managed::add);
+                    .orElse(null);
+
+                if(existing != null) {
+                    managed.add(existing);
+                }
+                else {
+                    // Transient placeholder — display only, never written to model
+                    IProperty placeholder = IArchimateFactory.eINSTANCE.createProperty();
+                    placeholder.setKey(key);
+                    placeholder.setValue(""); //$NON-NLS-1$
+                    managed.add(placeholder);
+                }
             }
 
             for(IProperty p : all) {
-                // Only show user properties that aren't managed by any decorator
                 if(!allDecoratorKeys.contains(p.getKey())) {
                     user.add(p);
                 }
@@ -834,11 +845,21 @@ public class UserPropertiesSection extends AbstractECorePropertySection {
 
             for(IProperties propertiesElement : fPropertiesElements) {
                 IProperty property = (IProperty)element;
-                
+
                 if(isAlive(propertiesElement)) {
                     if(isMultiSelection()) {
                         property = getFirstMatchingProperty(propertiesElement.getProperties(), property);
                     }
+
+                    // If this is a display-only placeholder, materialise it in the model first
+                    if(property != null && !propertiesElement.getProperties().contains(property)) {
+                        IProperty newProp = IArchimateFactory.eINSTANCE.createProperty();
+                        newProp.setKey(property.getKey());
+                        newProp.setValue(""); //$NON-NLS-1$
+                        compoundCmd.add(new NewPropertyCommand(propertiesElement.getProperties(), newProp, -1));
+                        property = newProp;
+                    }
+
                     if(property != null) {
                         Command cmd = new EObjectFeatureCommand(Messages.UserPropertiesSection_11, property, IArchimatePackage.Literals.PROPERTY__VALUE, value);
                         if(cmd.canExecute()) {
@@ -847,18 +868,17 @@ public class UserPropertiesSection extends AbstractECorePropertySection {
                     }
                 }
             }
-            
+
             // Decorator side effects
             if(element instanceof IProperty p) {
                 IPropertyDecorator decorator = PropertyDecoratorRegistry.getDecorator(p.getKey());
                 if(decorator != null) {
                     for(IProperties propertiesElement : fPropertiesElements) {
-                        // Call the IProperties version which handles both IArchimateElement and IDiagramModel
                         decorator.contributeCommands(propertiesElement, (String)value, compoundCmd);
                     }
                 }
             }
-            
+
             if(isMultiSelection()) {
                 try {
                     ignoreMessages = true;
@@ -1204,26 +1224,28 @@ public class UserPropertiesSection extends AbstractECorePropertySection {
         @Override
         public void run() {
             CompoundCommand cmd = isMultiSelection() ? new CompoundCommand() : new EObjectNonNotifyingCompoundCommand(getFirstSelectedElement());
-            
+
             for(Object o : ((IStructuredSelection)fTableViewer.getSelection()).toList()) {
                 IProperty selectedProperty = (IProperty)o;
-                if(isReadOnlyProperty(selectedProperty.getKey())) {
-                    continue; // skip protected properties
-                }
+
                 for(IProperties propertiesElement : fPropertiesElements) {
                     if(isAlive(propertiesElement)) {
-                        IProperty property = selectedProperty;
-                        if(isMultiSelection()) {
-                            property = getFirstMatchingProperty(propertiesElement.getProperties(), property);
+                        // Always resolve by key — selectedProperty may be a display-only placeholder
+                        IProperty property = getFirstMatchingProperty(propertiesElement.getProperties(), selectedProperty);
+
+                        // Skip placeholders — not in the model yet, nothing to remove
+                        if(property == null) {
+                            continue;
                         }
-                        if(property != null) {
-                            cmd.add(new RemovePropertyCommand(propertiesElement.getProperties(), property));
-                        }
+
+                        cmd.add(new RemovePropertyCommand(propertiesElement.getProperties(), property));
                     }
                 }
             }
-            
-            executeCommand(cmd);
+
+            if(cmd.canExecute()) {
+                executeCommand(cmd);
+            }
         }
     }
 
