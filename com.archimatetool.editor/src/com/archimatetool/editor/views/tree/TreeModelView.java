@@ -12,7 +12,9 @@ import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-
+import com.archimatetool.editor.tools.GenerateDiffViewCommand;
+import com.archimatetool.model.IArchimateDiagramModel;
+import org.eclipse.gef.commands.CommandStack;
 import org.eclipse.emf.common.notify.Notification;
 import org.eclipse.emf.ecore.EObject;
 import org.eclipse.help.HelpSystem;
@@ -93,6 +95,8 @@ import com.archimatetool.model.IArchimateElement;
 import com.archimatetool.model.IProperty;
 import com.archimatetool.editor.model.commands.EObjectFeatureCommand;
 import org.eclipse.gef.commands.CompoundCommand;
+import com.archimatetool.editor.tools.GenerateDiffViewCommand;
+import com.archimatetool.model.IArchimateDiagramModel;
 
 /**
  * Tree Model View
@@ -128,7 +132,7 @@ implements ITreeModelView, IUIRequestListener {
     private IViewerAction fActionPaste;
     
     private IViewerAction fActionGenerateView;
-    
+    private IAction fActionCompareView;
     private TreeModelViewerFindReplaceProvider fFindReplaceProvider;
     
     private TreeSelectionSynchroniser fSynchroniser;
@@ -408,6 +412,24 @@ implements ITreeModelView, IUIRequestListener {
             }
         };
         
+        fActionCompareView = new Action("Compare with...") { //$NON-NLS-1$
+            @Override
+            public void run() {
+                Object selected = getViewer().getStructuredSelection().getFirstElement();
+                if(!(selected instanceof IArchimateDiagramModel viewA)) return;
+
+                GenerateDiffViewCommand command = new GenerateDiffViewCommand(viewA);
+                if(command.openDialog(getViewSite().getShell())) {
+                    IArchimateModel model = viewA.getArchimateModel();
+                    if(model != null) {
+                        CommandStack stack = (CommandStack) model.getAdapter(CommandStack.class);
+                        if(stack != null) stack.execute(command);
+                    }
+                }
+            }
+        };
+        
+        
         // Add these actions to the key binding service
         IHandlerService handlerService = getSite().getService(IHandlerService.class);
         handlerService.activateHandler(IWorkbenchCommandConstants.NAVIGATE_COLLAPSE_ALL, new ActionHandler(fActionCollapseSelected));
@@ -493,6 +515,9 @@ implements ITreeModelView, IUIRequestListener {
         // Selected a Diagram
         if(fActionOpenDiagram.isEnabled()) {
             manager.add(fActionOpenDiagram);
+            if(selected instanceof IArchimateDiagramModel) {
+                manager.add(fActionCompareView);
+            }
             manager.add(new Separator("open")); //$NON-NLS-1$
         }
         
@@ -829,6 +854,7 @@ implements ITreeModelView, IUIRequestListener {
         fActionCloseModel = null;
         fActionSaveModel = null;
         fActionDelete = null;
+        fActionCompareView = null;
         
         // Clear Cut/Paste clipboard
         TreeModelCutAndPaste.INSTANCE.clear();
