@@ -153,6 +153,8 @@ public class UserPropertiesSection extends AbstractECorePropertySection {
     // Display all items
     private static final int MAX_ITEMS_ALL = -1;
     
+    private final Set<String> fUserClearedKeys = new HashSet<>();
+    
     @Override
     protected void createControls(Composite parent) {
         createTableControl(parent);
@@ -241,20 +243,19 @@ public class UserPropertiesSection extends AbstractECorePropertySection {
 
     @Override
     protected void update() {
-        // Get selected properties elements
         fPropertiesElements = new ArrayList<>();
-        
+
         for(IArchimateModelObject obj : getEObjects()) {
             if(obj instanceof IProperties p) {
                 fPropertiesElements.add(p);
             }
         }
-        
+
+        // Reset cleared keys when selection changes — new element, fresh state
+        fUserClearedKeys.clear();
+
         fTableViewer.setInput(fPropertiesElements);
-        
-        // Locked
         updateLocked();
-        
     }
     
     
@@ -625,45 +626,47 @@ public class UserPropertiesSection extends AbstractECorePropertySection {
             IProperties target = getFirstSelectedElement();
             List<IProperty> all = new ArrayList<>(target.getProperties());
 
-            // Keys managed by decorators that apply to this target type
-            List<String> managedKeys = new ArrayList<>();
-            for(IPropertyDecorator decorator : PropertyDecoratorRegistry.getAllDecorators()) {
-                if(decorator.appliesTo(target)) {
-                    managedKeys.add(decorator.getPropertyKey());
-                }
-            }
-
-            // Keys owned by ANY decorator — used to filter user properties
+            // Keys owned by ANY decorator — used to filter inapplicable ones out
             Set<String> allDecoratorKeys = new HashSet<>();
             for(IPropertyDecorator decorator : PropertyDecoratorRegistry.getAllDecorators()) {
                 allDecoratorKeys.add(decorator.getPropertyKey());
             }
 
+            // Keys managed by decorators that apply to THIS target type
+            Set<String> applicableDecoratorKeys = new LinkedHashSet<>(); // ordered — preserves decorator registration order
+            for(IPropertyDecorator decorator : PropertyDecoratorRegistry.getAllDecorators()) {
+                if(decorator.appliesTo(target)) {
+                    applicableDecoratorKeys.add(decorator.getPropertyKey());
+                }
+            }
+
             List<IProperty> managed = new ArrayList<>();
             List<IProperty> user    = new ArrayList<>();
 
-            for(String key : managedKeys) {
-                // Find existing property on the model, or synthesize a display-only placeholder
+            // For each applicable managed key — show real property if it exists,
+            // synthesize a placeholder if not yet set, skip if user explicitly deleted it
+            for(String key : applicableDecoratorKeys) {
                 IProperty existing = all.stream()
                     .filter(p -> key.equals(p.getKey()))
                     .findFirst()
                     .orElse(null);
 
                 if(existing != null) {
-                    managed.add(existing);
+                    managed.add(existing); // real property — show it
                 }
-                else {
-                    // Transient placeholder — display only, never written to model
+                else if(!fUserClearedKeys.contains(key)) {
+                    // Never set — synthesize a placeholder so the row is visible
                     IProperty placeholder = IArchimateFactory.eINSTANCE.createProperty();
                     placeholder.setKey(key);
                     placeholder.setValue(""); //$NON-NLS-1$
                     managed.add(placeholder);
                 }
+                // else: user explicitly deleted it this session — don't show it
             }
 
             for(IProperty p : all) {
                 if(!allDecoratorKeys.contains(p.getKey())) {
-                    user.add(p);
+                    user.add(p); // real user property — show it
                 }
             }
 
@@ -1230,21 +1233,26 @@ public class UserPropertiesSection extends AbstractECorePropertySection {
 
                 for(IProperties propertiesElement : fPropertiesElements) {
                     if(isAlive(propertiesElement)) {
-                        // Always resolve by key — selectedProperty may be a display-only placeholder
                         IProperty property = getFirstMatchingProperty(propertiesElement.getProperties(), selectedProperty);
 
-                        // Skip placeholders — not in the model yet, nothing to remove
                         if(property == null) {
-                            continue;
+                            // It's a placeholder — mark it as cleared so getElements() won't re-synthesize it
+                            fUserClearedKeys.add(selectedProperty.getKey());
                         }
-
-                        cmd.add(new RemovePropertyCommand(propertiesElement.getProperties(), property));
+                        else {
+                            cmd.add(new RemovePropertyCommand(propertiesElement.getProperties(), property));
+                            fUserClearedKeys.add(property.getKey());
+                        }
                     }
                 }
             }
 
             if(cmd.canExecute()) {
                 executeCommand(cmd);
+            }
+            else {
+                // No model changes needed — just refresh to hide the cleared placeholders
+                fTableViewer.refresh();
             }
         }
     }
