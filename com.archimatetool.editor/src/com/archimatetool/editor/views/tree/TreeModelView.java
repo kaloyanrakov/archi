@@ -49,7 +49,7 @@ import org.eclipse.ui.PlatformUI;
 import org.eclipse.ui.actions.ActionFactory;
 import org.eclipse.ui.handlers.IHandlerService;
 import org.eclipse.ui.part.DrillDownAdapter;
-
+import com.archimatetool.editor.propertysections.LevelingPropertyDecorator;
 import com.archimatetool.editor.ArchiPlugin;
 import com.archimatetool.editor.actions.ArchiActionFactory;
 import com.archimatetool.editor.actions.NewArchimateModelAction;
@@ -273,6 +273,43 @@ implements ITreeModelView, IUIRequestListener {
     @Override
     public TreeModelViewer getViewer() {
         return fTreeViewer;
+    }
+    
+    private List<IAction> buildLevelActions() {
+        List<IAction> actions = new ArrayList<>();
+
+        IPropertyDecorator decorator = PropertyDecoratorRegistry.getDecorator(
+            LevelingPropertyDecorator.PROPERTY_MODEL_LEVEL);
+
+        if(decorator == null) {
+            return actions;
+        }
+
+        for(String level : LevelingPropertyDecorator.MODEL_LEVEL_VALUES) {
+            final String finalLevel = level;
+            actions.add(new Action(level) {
+                @Override
+                public void run() {
+                    IStructuredSelection selection = getViewer().getStructuredSelection();
+                    CompoundCommand compoundCmd = new CompoundCommand();
+
+                    for(Object obj : selection.toList()) {
+                        if(obj instanceof IArchimateElement element && element.getArchimateModel() != null) {
+                            decorator.contributeCommands(element, finalLevel, compoundCmd);
+                        }
+                    }
+
+                    if(compoundCmd.canExecute()) {
+                        org.eclipse.gef.commands.CommandStack stack =
+                            (org.eclipse.gef.commands.CommandStack) getActiveArchimateModel()
+                                .getAdapter(org.eclipse.gef.commands.CommandStack.class);
+                        stack.execute(compoundCmd.unwrap());
+                    }
+                }
+            });
+        }
+
+        return actions;
     }
     
     /**
@@ -501,44 +538,9 @@ implements ITreeModelView, IUIRequestListener {
             manager.add(fActionRename);
             
             boolean hasElements = selection.toList().stream().anyMatch(o -> o instanceof IArchimateElement);
-            if(hasElements) {
+            if(hasElements && !fLevelActions.isEmpty()) {
                 MenuManager levelMenu = new MenuManager("Batch Assign Level"); //$NON-NLS-1$
-                for(String level : PropertyDecoratorRegistry.getAllDecorators().stream()
-                        .filter(d -> "Model Level".equals(d.getPropertyKey())) //$NON-NLS-1$
-                        .findFirst()
-                        .map(d -> d.getRestrictedValues())
-                        .orElse(new String[0])) {
-                    if(level.isEmpty()) continue;
-                    final String finalLevel = level;
-                    levelMenu.add(new Action(level) {
-                        @Override
-                        public void run() {
-                            CompoundCommand compoundCmd = new CompoundCommand();
-                            IPropertyDecorator decorator = PropertyDecoratorRegistry.getDecorator("Model Level"); //$NON-NLS-1$
-                            for(Object obj : selection.toList()) {
-                                if(!(obj instanceof IArchimateElement element)) continue;
-                                if(element.getArchimateModel() == null) continue;
-                                for(IProperty p : element.getProperties()) {
-                                    if("Model Level".equals(p.getKey())) { //$NON-NLS-1$
-                                        compoundCmd.add(new EObjectFeatureCommand(
-                                            "Set Model Level", p, //$NON-NLS-1$
-                                            IArchimatePackage.Literals.PROPERTY__VALUE, finalLevel));
-                                        break;
-                                    }
-                                }
-                                if(decorator != null) {
-                                    decorator.contributeCommands(element, finalLevel, compoundCmd);
-                                }
-                            }
-                            if(compoundCmd.canExecute()) {
-                                org.eclipse.gef.commands.CommandStack stack = 
-                                    (org.eclipse.gef.commands.CommandStack)getActiveArchimateModel().getAdapter(
-                                        org.eclipse.gef.commands.CommandStack.class);
-                                stack.execute(compoundCmd.unwrap());
-                            }
-                        }
-                    });
-                }
+                fLevelActions.forEach(levelMenu::add);
                 manager.add(levelMenu);
             }
 
