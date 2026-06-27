@@ -30,6 +30,7 @@ import java.util.Set;
 import com.archimatetool.model.IArchimateElement;
 import com.archimatetool.model.IArchimateRelationship;
 import com.archimatetool.model.IDiagramModelGroup;
+
 /**
  * Command that generates a diff view between two ArchiMate diagram views.
  *
@@ -236,14 +237,14 @@ public class GenerateDiffViewCommand extends Command {
 
 
     private void collectGroupsByName(java.util.List<IDiagramModelObject> children, Map<String, IDiagramModelContainer> result) {
-    	for(IDiagramModelObject child : children) {
-    		if(child instanceof IDiagramModelGroup group) {
-    			if(group.getName() != null) {
-    				result.put(group.getName(), group);
-    			}
-    			collectGroupsByName(group.getChildren(), result);
-    			}
-    	}
+        for(IDiagramModelObject child : children) {
+            if(child instanceof IDiagramModelGroup group && group.getName() != null) {
+                result.put(group.getName(), group);
+            }
+            if(child instanceof IDiagramModelContainer container) {
+                collectGroupsByName(container.getChildren(), result);
+            }
+        }
     }
     
     private void nudgeOverlappingRootItems(IArchimateDiagramModel diffView) {
@@ -292,31 +293,53 @@ public class GenerateDiffViewCommand extends Command {
         for(IDiagramModelObject child : srcChildren) {
             if(child instanceof IDiagramModelArchimateObject dmo) {
                 IArchimateElement el = dmo.getArchimateElement();
-                if(el == null || baseElems.containsKey(el.getId())) continue;
+                IDiagramModelContainer childDest = destContainer; // where children of this dmo should go
 
-                if(destContainer instanceof IDiagramModel) {
-                    // Defer root items — collect for second pass
-                    newRootDmos.add(dmo);
+                if(el == null || baseElems.containsKey(el.getId())) {
+                    // Element already in viewA — but still recurse into its children
+                    // using the corresponding copy in the diff view as the container
+                    // (find it via srcToCopy which is populated from viewA — but we
+                    // don't have access to it here; just use destContainer as fallback)
                 } else {
-                    // Inside a group — place immediately with relative position
-                    if(!groupCounters.containsKey(destContainer)) {
-                        int baseY = PADDING;
-                        for(IDiagramModelObject existing : destContainer.getChildren()) {
-                            int bottom = existing.getBounds().getY() + Math.max(existing.getBounds().getHeight(), 0);
-                            baseY = Math.max(baseY, bottom + PADDING);
+                    // New element — add it
+                    IDiagramModelArchimateObject copy;
+                    if(destContainer instanceof IDiagramModel) {
+                        newRootDmos.add(dmo);
+                        // Can't recurse into children properly without the copy yet;
+                        // add dmo to newRootDmos and handle children in the second pass
+                        copy = null;
+                    } else {
+                        if(!groupCounters.containsKey(destContainer)) {
+                            int baseY = PADDING;
+                            for(IDiagramModelObject existing : destContainer.getChildren()) {
+                                int bottom = existing.getBounds().getY() + Math.max(existing.getBounds().getHeight(), 0);
+                                baseY = Math.max(baseY, bottom + PADDING);
+                            }
+                            groupCounters.put(destContainer, new int[]{0, 0, baseY});
                         }
-                        groupCounters.put(destContainer, new int[]{0, 0, baseY});
+                        int[] gc = groupCounters.get(destContainer);
+                        int x = PADDING + gc[0] * CELL_W;
+                        int y = gc[2] + gc[1] * CELL_H;
+                        copy = copyDmo(dmo, x, y);
+                        copy.setFillColor(darkenColor(dmo));
+                        destContainer.getChildren().add(copy);
+                        srcToCopyB.put(dmo, copy);
+                        if(++gc[0] >= COLS) { gc[0] = 0; gc[1]++; }
+                        expandContainerToFit((IDiagramModelObject)destContainer);
+                        childDest = copy; // recurse into this new copy
                     }
-                    int[] gc = groupCounters.get(destContainer);
-                    int x = PADDING + gc[0] * CELL_W;
-                    int y = gc[2] + gc[1] * CELL_H;
-                    IDiagramModelArchimateObject copy = copyDmo(dmo, x, y);
-                    copy.setFillColor(darkenColor(dmo));   // in addNewElementsFromViewB
+                    if(copy != null && !dmo.getChildren().isEmpty()) {
+                        addNewElementsFromViewB(dmo.getChildren(), childDest,
+                            diffGroupsByName, baseElems, srcToCopyB, newRootDmos,
+                            groupCounters, CELL_W, CELL_H, PADDING, COLS);
+                    }
+                }
 
-                    destContainer.getChildren().add(copy);
-                    srcToCopyB.put(dmo, copy);
-                    if(++gc[0] >= COLS) { gc[0] = 0; gc[1]++; }
-                    expandGroupToFit((IDiagramModelObject) destContainer, x + CELL_W + PADDING, y + CELL_H + PADDING);
+                // Recurse into children of existing (viewA) elements too
+                if((el == null || baseElems.containsKey(el.getId())) && !dmo.getChildren().isEmpty()) {
+                    addNewElementsFromViewB(dmo.getChildren(), destContainer,
+                        diffGroupsByName, baseElems, srcToCopyB, newRootDmos,
+                        groupCounters, CELL_W, CELL_H, PADDING, COLS);
                 }
 
             } else if(child instanceof IDiagramModelGroup group) {
@@ -334,6 +357,7 @@ public class GenerateDiffViewCommand extends Command {
             }
         }
     }
+    
     
     private void copyViewRecursive(
             java.util.List<IDiagramModelObject> srcChildren,
@@ -361,6 +385,37 @@ public class GenerateDiffViewCommand extends Command {
                 destContainer.getChildren().add((IDiagramModelObject) groupCopy);
                 copyViewRecursive(container.getChildren(), groupCopy, targetElems, srcToCopy);
             }
+        }
+    }
+    private void expandContainerToFit(IDiagramModelObject container) {
+
+        if(!(container instanceof IDiagramModelContainer modelContainer)) {
+            return;
+        }
+
+        int maxRight = 0;
+        int maxBottom = 0;
+        final int PADDING = 20;
+
+        for(IDiagramModelObject child : modelContainer.getChildren()) {
+            maxRight = Math.max(maxRight,
+                    child.getBounds().getX() + child.getBounds().getWidth());
+
+            maxBottom = Math.max(maxBottom,
+                    child.getBounds().getY() + child.getBounds().getHeight());
+        }
+
+        if(maxRight + PADDING > container.getBounds().getWidth()) {
+            container.getBounds().setWidth(maxRight + PADDING);
+        }
+
+        if(maxBottom + PADDING > container.getBounds().getHeight()) {
+            container.getBounds().setHeight(maxBottom + PADDING);
+        }
+
+        // Grow the parent container as well
+        if(container.eContainer() instanceof IDiagramModelObject parent) {
+            expandContainerToFit(parent);
         }
     }
 
