@@ -36,6 +36,7 @@ import org.eclipse.jface.action.MenuManager;
 import org.eclipse.jface.action.Separator;
 import org.eclipse.jface.action.ToolBarManager;
 import org.eclipse.jface.dialogs.IDialogConstants;
+import org.eclipse.jface.dialogs.MessageDialog;
 import org.eclipse.jface.layout.GridDataFactory;
 import org.eclipse.jface.layout.TableColumnLayout;
 import org.eclipse.jface.util.LocalSelectionTransfer;
@@ -72,6 +73,7 @@ import org.eclipse.swt.graphics.Point;
 import org.eclipse.swt.graphics.Rectangle;
 import org.eclipse.swt.widgets.Composite;
 import org.eclipse.swt.widgets.Control;
+import org.eclipse.swt.widgets.Display;
 import org.eclipse.swt.widgets.Event;
 import org.eclipse.swt.widgets.Listener;
 import org.eclipse.swt.widgets.Menu;
@@ -881,6 +883,18 @@ public class UserPropertiesSection extends AbstractECorePropertySection {
                     }
                 }
             }
+            
+         // Notify user if other views will be affected
+            if(IterationPropertyDecorator.VIEW_LINK_KEYS.contains(((IProperty)element).getKey())
+                    && compoundCmd.size() > 1) {   // >1 means the reciprocal command was added
+                boolean confirmed = MessageDialog.openConfirm(
+                    Display.getCurrent().getActiveShell(),
+                    "Update Linked Views",
+                    "This will also update the reciprocal property on the linked view. Continue?"
+                );
+                if(!confirmed) return;
+            }
+
 
             if(isMultiSelection()) {
                 try {
