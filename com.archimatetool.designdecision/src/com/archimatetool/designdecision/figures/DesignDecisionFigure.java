@@ -126,9 +126,4 @@ public class DesignDecisionFigure extends AbstractTextControlContainerFigure imp
     public IFigureDelegate getFigureDelegate() {
         return getDiagramModelArchimateObject().getType() == 0 ? roundedRectangleDelegate : null;
     }
-
-    @Override
-    public IIconDelegate getIconDelegate() {
-        return iconDelegate;
-    }
 }

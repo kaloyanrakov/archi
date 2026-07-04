@@ -7,6 +7,7 @@ import org.eclipse.swt.graphics.Color;
 import org.eclipse.swt.graphics.Image;
 
 import com.archimatetool.editor.diagram.editparts.ArchimateElementEditPart;
+import com.archimatetool.editor.ui.IIconDelegate;
 import com.archimatetool.editor.ui.factory.elements.AbstractArchimateElementUIProvider;
 import com.archimatetool.designdecision.IDesignDecisionImages;
 import com.archimatetool.designdecision.figures.DesignDecisionFigure;
@@ -41,7 +42,7 @@ public class DesignDecisionUIProvider extends AbstractArchimateElementUIProvider
 
     @Override
     public Color getDefaultColor() {
-        return defaultMotivationColor; // purple, consistent with the Motivation layer
+        return defaultMotivationColor;
     }
 
     @Override
