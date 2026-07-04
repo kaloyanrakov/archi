@@ -255,7 +255,7 @@ frame(element, map) ::= <<
 								</tr>
 							</thead>
 							<tbody>
-								^element.Properties:{p | <tr><td>^p.Key;format="xml-encode"^</td><td class="convertlinks no-margin" style="white-space:pre-wrap">^p.Value;format="xml-encode"^</td></tr>}^
+								^element.Properties:{p | ^if(p.Value)^<tr><td>^p.Key;format="xml-encode"^</td><td class="convertlinks no-margin" style="white-space:pre-wrap">^p.Value;format="xml-encode"^</td></tr>^endif^}^
 							</tbody>
 						</table>
 					</div>

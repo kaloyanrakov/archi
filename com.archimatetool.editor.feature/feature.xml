@@ -131,5 +131,9 @@ OTHER DEALINGS IN THE SOFTWARE.
    <plugin
          id="com.archimatetool.markdown"
          version="0.0.0"/>
+      
+    <plugin
+         id="com.archimatetool.designdecision"
+         version="0.0.0"/>  
 
 </feature>

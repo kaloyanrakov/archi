@@ -249,10 +249,17 @@ public class TreeModelViewActionFactory {
                 previousIterationProperty.setKey("Previous Iteration"); //$NON-NLS-1$
                 diagramModel.getProperties().add(previousIterationProperty);
 
-                // Add Next Iteration property
                 IProperty nextIterationProperty = IArchimateFactory.eINSTANCE.createProperty();
                 nextIterationProperty.setKey("Next Iteration"); //$NON-NLS-1$
                 diagramModel.getProperties().add(nextIterationProperty);
+
+                IProperty previousVersionProperty = IArchimateFactory.eINSTANCE.createProperty();
+                previousVersionProperty.setKey("Previous Version"); //$NON-NLS-1$
+                diagramModel.getProperties().add(previousVersionProperty);
+
+                IProperty nextVersionProperty = IArchimateFactory.eINSTANCE.createProperty();
+                nextVersionProperty.setKey("Next Version"); //$NON-NLS-1$
+                diagramModel.getProperties().add(nextVersionProperty);
                 
                 // Execute Command
                 Command cmd = new NewDiagramCommand(folder, diagramModel, Messages.TreeModelViewActionFactory_1);

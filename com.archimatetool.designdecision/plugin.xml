@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?eclipse version="3.7"?>
+<plugin>
+
+  <extension point="org.eclipse.emf.ecore.generated_package">
+    <package
+      class="com.archimatetool.designdecision.model.IDesignDecisionPackage"
+      genModel="model/designdecision.genmodel"
+      uri="http://www.archimatetool.com/archimate/designdecision"/>
+  </extension>
+
+   <extension point="org.eclipse.emf.ecore.extension_parser">
+      <!-- @generated designdecision -->
+      <parser
+            type="designdecision"
+            class="com.archimatetool.designdecision.model.util.DesignDecisionResourceFactory"/>
+   </extension>
+
+  <extension point="com.archimatetool.editor.objectUIProvider">
+    <uiProvider
+      class="com.archimatetool.designdecision.factory.DesignDecisionUIProvider"
+      id="com.archimatetool.designdecision.DesignDecisionUIProvider"/>
+  </extension>
+
+</plugin>
