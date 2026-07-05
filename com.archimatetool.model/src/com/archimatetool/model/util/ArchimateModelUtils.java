@@ -372,7 +372,7 @@ public class ArchimateModelUtils {
      * @return A list of EClass types in the Motivation extension in preferred order
      */
     public static EClass[] getMotivationClasses() {
-        return new EClass[] {
+        List<EClass> classes = new ArrayList<>(Arrays.asList(
                 IArchimatePackage.eINSTANCE.getStakeholder(),
                 IArchimatePackage.eINSTANCE.getDriver(),
                 IArchimatePackage.eINSTANCE.getAssessment(),
@@ -383,7 +383,22 @@ public class ArchimateModelUtils {
                 IArchimatePackage.eINSTANCE.getConstraint(),
                 IArchimatePackage.eINSTANCE.getMeaning(),
                 IArchimatePackage.eINSTANCE.getValue()
-        };
+        ));
+
+        // Design Decision (from extension plugin)
+        try {
+            EClass designDecision = (EClass) org.eclipse.emf.ecore.EPackage.Registry.INSTANCE
+                    .getEPackage("http://www.archimatetool.com/archimate/designdecision")
+                    .getEClassifier("DesignDecision");
+            if(designDecision != null) {
+                classes.add(designDecision);
+            }
+        }
+        catch(Exception e) {
+            // plugin not loaded, skip
+        }
+
+        return classes.toArray(new EClass[0]);
     }
     
     /**

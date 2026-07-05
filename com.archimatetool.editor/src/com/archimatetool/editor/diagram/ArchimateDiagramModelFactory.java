@@ -119,7 +119,16 @@ public class ArchimateDiagramModelFactory implements ICreationFactory {
             return null;
         }
         
-        EObject object = IArchimateFactory.eINSTANCE.create(template);
+        // Try the standard core factory first, fall back to EMF registry for external packages
+        EObject object;
+        try {
+            object = IArchimateFactory.eINSTANCE.create(template);
+        }
+        catch(IllegalArgumentException ex) {
+            // Element is from an external EMF package (e.g. a plugin-contributed element)
+            // Use the package's own factory instead
+            object = template.getEPackage().getEFactoryInstance().create(template);
+        }
         
         // Are we creating a profile?
         IProfile profile = property instanceof IProfile p && p.getArchimateModel() != null ? p : null;

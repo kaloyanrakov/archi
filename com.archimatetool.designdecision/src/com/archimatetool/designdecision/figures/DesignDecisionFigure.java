@@ -38,21 +38,19 @@ public class DesignDecisionFigure extends AbstractTextControlContainerFigure imp
 
         setLineWidth(graphics, rect);
 
-        Rectangle imageBounds = rect.getCopy();
         setFigurePositionFromTextPosition(rect);
 
         graphics.setAlpha(getAlpha());
         graphics.setBackgroundColor(getFillColor());
         Pattern gradient = applyGradientPattern(graphics, rect);
 
-        // Draw a diamond shape to represent a decision
         Path path = new Path(null);
         int cx = rect.x + rect.width / 2;
         int cy = rect.y + rect.height / 2;
-        path.moveTo(cx, rect.y);                        // top
-        path.lineTo(rect.x + rect.width, cy);           // right
-        path.lineTo(cx, rect.y + rect.height);          // bottom
-        path.lineTo(rect.x, cy);                        // left
+        path.moveTo(cx, rect.y);
+        path.lineTo(rect.x + rect.width, cy);
+        path.lineTo(cx, rect.y + rect.height);
+        path.lineTo(rect.x, cy);
         path.close();
 
         graphics.fillPath(path);
@@ -64,7 +62,7 @@ public class DesignDecisionFigure extends AbstractTextControlContainerFigure imp
 
         path.dispose();
 
-        drawIconImage(graphics, imageBounds, 0, 0, 0, 0);
+        // REMOVED: drawIconImage(graphics, imageBounds, 0, 0, 0, 0);
 
         graphics.popState();
     }
