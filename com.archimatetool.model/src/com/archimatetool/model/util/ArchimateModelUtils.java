@@ -41,6 +41,17 @@ import com.archimatetool.model.IProfiles;
  * @author Phillip Beauvoir
  */
 public class ArchimateModelUtils {
+	
+	public interface IExternalRelationshipValidator {
+        boolean isValidRelationshipStart(EClass sourceType, EClass relationshipType);
+        boolean isValidRelationship(EClass sourceType, EClass targetType, EClass relationshipType);
+    }
+
+    private static final List<IExternalRelationshipValidator> externalValidators = new ArrayList<>();
+
+    public static void registerExternalRelationshipValidator(IExternalRelationshipValidator validator) {
+        externalValidators.add(validator);
+    }
     
     /**
      * Determine if a given relationship type is allowed as a source for an Archimate concept
@@ -48,32 +59,34 @@ public class ArchimateModelUtils {
      * @param relationshipType The class of relationship to check
      * @return True if relationshipType is a valid source relationship for sourceComponent
      */
-	public static final boolean isValidRelationshipStart(IArchimateConcept sourceConcept, EClass relationshipType) {
-	    // If the source concept is a Junction check for valid relationships
-	    if(sourceConcept instanceof IJunction) {
-	        // Has to be the same type of relationship
-	        for(IArchimateRelationship rel : getAllRelationshipsForConcept(sourceConcept)) {
-	            if(!rel.eClass().equals(relationshipType)) {
-	                return false;
-	            }
-	        }
-	    }
+    public static final boolean isValidRelationshipStart(IArchimateConcept sourceConcept, EClass relationshipType) {
+        if(sourceConcept instanceof IJunction) {
+            for(IArchimateRelationship rel : getAllRelationshipsForConcept(sourceConcept)) {
+                if(!rel.eClass().equals(relationshipType)) {
+                    return false;
+                }
+            }
+        }
 
-	    // If the concept's EClass is not in the matrix, walk up its supertype hierarchy
-	    // to find the nearest registered type (e.g. DesignDecision -> MotivationElement)
-	    EClass sourceType = sourceConcept.eClass();
+        // Check external validators first (e.g. DesignDecision from plugin)
+        for(IExternalRelationshipValidator validator : externalValidators) {
+            if(validator.isValidRelationshipStart(sourceConcept.eClass(), relationshipType)) {
+                return true;
+            }
+        }
 
-	    if(!RelationshipsMatrix.INSTANCE.isValidRelationshipStart(sourceType, relationshipType)) {
-	        for(EClass superType : sourceType.getEAllSuperTypes()) {
-	            if(RelationshipsMatrix.INSTANCE.isValidRelationshipStart(superType, relationshipType)) {
-	                return true;
-	            }
-	        }
-	        return false;
-	    }
+        EClass sourceType = sourceConcept.eClass();
+        if(!RelationshipsMatrix.INSTANCE.isValidRelationshipStart(sourceType, relationshipType)) {
+            for(EClass superType : sourceType.getEAllSuperTypes()) {
+                if(RelationshipsMatrix.INSTANCE.isValidRelationshipStart(superType, relationshipType)) {
+                    return true;
+                }
+            }
+            return false;
+        }
 
-	    return true;
-	}
+        return true;
+    }
     
     /**
      * Determine if a given relationship type is allowed between source and target Archimate components
@@ -137,7 +150,12 @@ public class ArchimateModelUtils {
      * @return True if relationshipType is an allowed relationship type between sourceType and targetType
      */
     public static final boolean isValidRelationship(EClass sourceType, EClass targetType, EClass relationshipType) {
-        // For plugin-contributed types not in the matrix, substitute the nearest registered supertype
+        // Check external validators first
+        for(IExternalRelationshipValidator validator : externalValidators) {
+            if(validator.isValidRelationship(sourceType, targetType, relationshipType)) {
+                return true;
+            }
+        }
         EClass resolvedSource = resolveToRegisteredType(sourceType);
         EClass resolvedTarget = resolveToRegisteredType(targetType);
         return RelationshipsMatrix.INSTANCE.isValidRelationship(resolvedSource, resolvedTarget, relationshipType);

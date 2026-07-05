@@ -833,14 +833,14 @@ public class UserPropertiesSection extends AbstractECorePropertySection {
                 return cellEditor;
             }
             else if("Impact".equals(property.getKey())) { //$NON-NLS-1$
-                items = new String[] { "", "constrains", "forbids", "enables", 
-                                       "conflicts with", "overrides", "is bound to", "is an alternative to" };
+                items = new String[] { "", "Constrains", "Forbids", "Enables", 
+                                       "Conflicts with", "Overrides", "Is bound to", "Is an alternative to" };
                 cellEditor.setItems(items);
                 cellEditor.setEditable(false);
                 return cellEditor;
             }
             else if("State".equals(property.getKey())) { //$NON-NLS-1$
-                items = new String[] { "", "idea", "experimented with", "used", "rejected", "obsolesced" };
+                items = new String[] { "", "Idea", "Experimented with", "Used", "Rejected", "Obsolesced" };
                 cellEditor.setItems(items);
                 cellEditor.setEditable(false);
                 return cellEditor;
