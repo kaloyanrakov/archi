@@ -58,7 +58,16 @@ public class FigureImagePreviewFactory {
         }
         
         IDiagramModelArchimateObject dmo = IArchimateFactory.eINSTANCE.createDiagramModelArchimateObject();
-        dmo.setArchimateElement((IArchimateElement)IArchimateFactory.eINSTANCE.create(eClass));
+        
+        IArchimateElement element;
+        try {
+            element = (IArchimateElement) IArchimateFactory.eINSTANCE.create(eClass);
+        }
+        catch(IllegalArgumentException ex) {
+            element = (IArchimateElement) eClass.getEPackage().getEFactoryInstance().create(eClass);
+        }
+
+        dmo.setArchimateElement(element);
         dmo.setName(uiProvider.getDefaultName());
         dmo.setType(type);
         dmo.setDeriveElementLineColor(false);

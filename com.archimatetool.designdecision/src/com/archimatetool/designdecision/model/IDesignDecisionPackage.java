@@ -4,7 +4,9 @@ package com.archimatetool.designdecision.model;
 
 import com.archimatetool.model.IArchimatePackage;
 
+import org.eclipse.emf.ecore.EAttribute;
 import org.eclipse.emf.ecore.EClass;
+import org.eclipse.emf.ecore.EEnum;
 import org.eclipse.emf.ecore.EPackage;
 
 /**
@@ -120,13 +122,33 @@ public interface IDesignDecisionPackage extends EPackage {
 	int DESIGN_DECISION__PROFILES = IArchimatePackage.MOTIVATION_ELEMENT__PROFILES;
 
 	/**
+	 * The feature id for the '<em><b>Decision Type</b></em>' attribute.
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @generated
+	 * @ordered
+	 */
+	int DESIGN_DECISION__DECISION_TYPE = IArchimatePackage.MOTIVATION_ELEMENT_FEATURE_COUNT + 0;
+
+	/**
 	 * The number of structural features of the '<em>Design Decision</em>' class.
 	 * <!-- begin-user-doc -->
 	 * <!-- end-user-doc -->
 	 * @generated
 	 * @ordered
 	 */
-	int DESIGN_DECISION_FEATURE_COUNT = IArchimatePackage.MOTIVATION_ELEMENT_FEATURE_COUNT + 0;
+	int DESIGN_DECISION_FEATURE_COUNT = IArchimatePackage.MOTIVATION_ELEMENT_FEATURE_COUNT + 1;
+
+
+	/**
+	 * The meta object id for the '{@link com.archimatetool.designdecision.model.DesignDecisionType <em>Type</em>}' enum.
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @see com.archimatetool.designdecision.model.DesignDecisionType
+	 * @see com.archimatetool.designdecision.model.impl.DesignDecisionPackage#getDesignDecisionType()
+	 * @generated
+	 */
+	int DESIGN_DECISION_TYPE = 1;
 
 
 	/**
@@ -138,6 +160,27 @@ public interface IDesignDecisionPackage extends EPackage {
 	 * @generated
 	 */
 	EClass getDesignDecision();
+
+	/**
+	 * Returns the meta object for the attribute '{@link com.archimatetool.designdecision.model.IDesignDecision#getDecisionType <em>Decision Type</em>}'.
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @return the meta object for the attribute '<em>Decision Type</em>'.
+	 * @see com.archimatetool.designdecision.model.IDesignDecision#getDecisionType()
+	 * @see #getDesignDecision()
+	 * @generated
+	 */
+	EAttribute getDesignDecision_DecisionType();
+
+	/**
+	 * Returns the meta object for enum '{@link com.archimatetool.designdecision.model.DesignDecisionType <em>Type</em>}'.
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @return the meta object for enum '<em>Type</em>'.
+	 * @see com.archimatetool.designdecision.model.DesignDecisionType
+	 * @generated
+	 */
+	EEnum getDesignDecisionType();
 
 	/**
 	 * Returns the factory that creates the instances of the model.
@@ -170,6 +213,22 @@ public interface IDesignDecisionPackage extends EPackage {
 		 * @generated
 		 */
 		EClass DESIGN_DECISION = eINSTANCE.getDesignDecision();
+		/**
+		 * The meta object literal for the '<em><b>Decision Type</b></em>' attribute feature.
+		 * <!-- begin-user-doc -->
+		 * <!-- end-user-doc -->
+		 * @generated
+		 */
+		EAttribute DESIGN_DECISION__DECISION_TYPE = eINSTANCE.getDesignDecision_DecisionType();
+		/**
+		 * The meta object literal for the '{@link com.archimatetool.designdecision.model.DesignDecisionType <em>Type</em>}' enum.
+		 * <!-- begin-user-doc -->
+		 * <!-- end-user-doc -->
+		 * @see com.archimatetool.designdecision.model.DesignDecisionType
+		 * @see com.archimatetool.designdecision.model.impl.DesignDecisionPackage#getDesignDecisionType()
+		 * @generated
+		 */
+		EEnum DESIGN_DECISION_TYPE = eINSTANCE.getDesignDecisionType();
 
 	}
 

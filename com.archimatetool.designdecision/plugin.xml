@@ -9,17 +9,27 @@
       uri="http://www.archimatetool.com/archimate/designdecision"/>
   </extension>
 
-   <extension point="org.eclipse.emf.ecore.extension_parser">
-      <!-- @generated designdecision -->
-      <parser
-            type="designdecision"
-            class="com.archimatetool.designdecision.model.util.DesignDecisionResourceFactory"/>
-   </extension>
+  <extension point="org.eclipse.emf.ecore.extension_parser">
+    <parser
+          type="designdecision"
+          class="com.archimatetool.designdecision.model.util.DesignDecisionResourceFactory"/>
+  </extension>
 
   <extension point="com.archimatetool.editor.objectUIProvider">
     <uiProvider
       class="com.archimatetool.designdecision.factory.DesignDecisionUIProvider"
       id="com.archimatetool.designdecision.DesignDecisionUIProvider"/>
+  </extension>
+
+  <extension point="org.eclipse.ui.views.properties.tabbed.propertySections">
+    <propertySections contributorId="com.archimatetool.editor">
+      <propertySection
+            class="com.archimatetool.designdecision.propertysections.DesignDecisionTypeSection"
+            filter="com.archimatetool.designdecision.propertysections.DesignDecisionTypeSection$Filter"
+            id="com.archimatetool.designdecision.decisionTypeSection"
+            tab="main.tab">
+      </propertySection>
+    </propertySections>
   </extension>
 
 </plugin>
