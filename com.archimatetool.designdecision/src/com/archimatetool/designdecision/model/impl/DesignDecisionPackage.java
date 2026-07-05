@@ -31,13 +31,6 @@ public class DesignDecisionPackage extends EPackageImpl implements IDesignDecisi
 	private EClass designDecisionEClass = null;
 
 	/**
-	 * <!-- begin-user-doc -->
-	 * <!-- end-user-doc -->
-	 * @generated
-	 */
-	private EEnum designDecisionTypeEEnum = null;
-
-	/**
 	 * Creates an instance of the model <b>Package</b>, registered with
 	 * {@link org.eclipse.emf.ecore.EPackage.Registry EPackage.Registry} by the package
 	 * package URI value.
@@ -116,26 +109,6 @@ public class DesignDecisionPackage extends EPackageImpl implements IDesignDecisi
 	 * @generated
 	 */
 	@Override
-	public EAttribute getDesignDecision_DecisionType() {
-		return (EAttribute)designDecisionEClass.getEStructuralFeatures().get(0);
-	}
-
-	/**
-	 * <!-- begin-user-doc -->
-	 * <!-- end-user-doc -->
-	 * @generated
-	 */
-	@Override
-	public EEnum getDesignDecisionType() {
-		return designDecisionTypeEEnum;
-	}
-
-	/**
-	 * <!-- begin-user-doc -->
-	 * <!-- end-user-doc -->
-	 * @generated
-	 */
-	@Override
 	public IDesignDecisionFactory getDesignDecisionFactory() {
 		return (IDesignDecisionFactory)getEFactoryInstance();
 	}
@@ -160,10 +133,6 @@ public class DesignDecisionPackage extends EPackageImpl implements IDesignDecisi
 
 		// Create classes and their features
 		designDecisionEClass = createEClass(DESIGN_DECISION);
-		createEAttribute(designDecisionEClass, DESIGN_DECISION__DECISION_TYPE);
-
-		// Create enums
-		designDecisionTypeEEnum = createEEnum(DESIGN_DECISION_TYPE);
 	}
 
 	/**
@@ -201,13 +170,6 @@ public class DesignDecisionPackage extends EPackageImpl implements IDesignDecisi
 
 		// Initialize classes and features; add operations and parameters
 		initEClass(designDecisionEClass, IDesignDecision.class, "DesignDecision", !IS_ABSTRACT, !IS_INTERFACE, IS_GENERATED_INSTANCE_CLASS);
-		initEAttribute(getDesignDecision_DecisionType(), this.getDesignDecisionType(), "decisionType", "Structural", 0, 1, IDesignDecision.class, !IS_TRANSIENT, !IS_VOLATILE, IS_CHANGEABLE, !IS_UNSETTABLE, !IS_ID, IS_UNIQUE, !IS_DERIVED, IS_ORDERED);
-
-		// Initialize enums and add enum literals
-		initEEnum(designDecisionTypeEEnum, DesignDecisionType.class, "DesignDecisionType");
-		addEEnumLiteral(designDecisionTypeEEnum, DesignDecisionType.STRUCTURAL);
-		addEEnumLiteral(designDecisionTypeEEnum, DesignDecisionType.BEHAVIORAL);
-		addEEnumLiteral(designDecisionTypeEEnum, DesignDecisionType.PROPERTY);
 
 		// Create resource
 		createResource(eNS_URI);

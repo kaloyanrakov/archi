@@ -802,6 +802,7 @@ public class UserPropertiesSection extends AbstractECorePropertySection {
      */
     private class ValueEditingSupport extends EditingSupport {
         StringComboBoxCellEditor cellEditor;
+        StringComboBoxCellEditor decisionTypeCellEditor; // read-only, fixed values
 
         public ValueEditingSupport(ColumnViewer viewer) {
             super(viewer);
@@ -809,6 +810,10 @@ public class UserPropertiesSection extends AbstractECorePropertySection {
             
             // Nullify some global Action Handlers so that this cell editor can handle them
             hookCellEditorGlobalActionHandler(cellEditor);
+            
+            decisionTypeCellEditor = new StringComboBoxCellEditor((Composite)viewer.getControl(),
+                    new String[] { "", "Structural", "Behavioral", "Property" }, false); //$NON-NLS-1$
+            hookCellEditorGlobalActionHandler(decisionTypeCellEditor);
         }
 
         @Override
@@ -819,8 +824,26 @@ public class UserPropertiesSection extends AbstractECorePropertySection {
             IPropertyDecorator decorator = PropertyDecoratorRegistry.getDecorator(property.getKey());
 
             if(decorator != null && decorator.getRestrictedValues(getFirstSelectedElement()).length > 0) {
-                // Decorator owns its dropdown values — iteration views, model levels, etc.
                 items = decorator.getRestrictedValues(getFirstSelectedElement());
+            }
+            else if("Decision Type".equals(property.getKey())) { //$NON-NLS-1$
+                items = new String[] { "", "Structural", "Behavioral", "Property" }; //$NON-NLS-1$
+                cellEditor.setItems(items);
+                cellEditor.setEditable(false);
+                return cellEditor;
+            }
+            else if("Impact".equals(property.getKey())) { //$NON-NLS-1$
+                items = new String[] { "", "constrains", "forbids", "enables", 
+                                       "conflicts with", "overrides", "is bound to", "is an alternative to" };
+                cellEditor.setItems(items);
+                cellEditor.setEditable(false);
+                return cellEditor;
+            }
+            else if("State".equals(property.getKey())) { //$NON-NLS-1$
+                items = new String[] { "", "idea", "experimented with", "used", "rejected", "obsolesced" };
+                cellEditor.setItems(items);
+                cellEditor.setEditable(false);
+                return cellEditor;
             }
             else {
                 items = isAlive(getFirstSelectedElement())

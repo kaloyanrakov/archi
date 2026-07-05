@@ -21,13 +21,13 @@
       id="com.archimatetool.designdecision.DesignDecisionUIProvider"/>
   </extension>
 
-  <extension point="org.eclipse.ui.views.properties.tabbed.propertySections">
+   <extension point="org.eclipse.ui.views.properties.tabbed.propertySections">
     <propertySections contributorId="com.archimatetool.editor">
       <propertySection
             class="com.archimatetool.designdecision.propertysections.DesignDecisionTypeSection"
             filter="com.archimatetool.designdecision.propertysections.DesignDecisionTypeSection$Filter"
             id="com.archimatetool.designdecision.decisionTypeSection"
-            tab="main.tab">
+            tab="properties.tab">
       </propertySection>
     </propertySections>
   </extension>

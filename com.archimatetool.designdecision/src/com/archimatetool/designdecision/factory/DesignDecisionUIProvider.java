@@ -49,14 +49,4 @@ public class DesignDecisionUIProvider extends AbstractArchimateElementUIProvider
     public IIconDelegate getIconDelegate() {
         return DesignDecisionFigure.getIconDelegate();
     }
-    @Override
-    public boolean shouldExposeFeature(String featureName) {
-        return switch(featureName) {
-            case "decisionType",
-                 "name",
-                 "documentation",
-                 "properties" -> true;
-            default -> false;
-        };
-    }
 }

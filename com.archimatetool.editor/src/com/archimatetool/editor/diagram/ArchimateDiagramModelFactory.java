@@ -29,6 +29,7 @@ import com.archimatetool.model.IDiagramModelNote;
 import com.archimatetool.model.IDiagramModelObject;
 import com.archimatetool.model.ILegendOptions;
 import com.archimatetool.model.IProfile;
+import com.archimatetool.model.IProperty;
 import com.archimatetool.model.ITextAlignment;
 import com.archimatetool.model.ITextPosition;
 
@@ -84,7 +85,23 @@ public class ArchimateDiagramModelFactory implements ICreationFactory {
         // Set user default colors as set in prefs
         ColorFactory.setDefaultColors(connection);
         
+        addOntologyConnectionProperties(relation);
+        
         return connection;
+    }
+    
+    private static void addOntologyConnectionProperties(IArchimateRelationship relation) {
+        boolean sourceIsDesignDecision = relation.getSource().eClass().getName().equals("DesignDecision"); //$NON-NLS-1$
+        boolean targetIsDesignDecision = relation.getTarget().eClass().getName().equals("DesignDecision"); //$NON-NLS-1$
+
+        // Design Decision -> Design Decision: add Impact property
+        if(sourceIsDesignDecision && targetIsDesignDecision) {
+            relation.getProperties().add(IArchimateFactory.eINSTANCE.createProperty("Impact", "")); //$NON-NLS-1$ //$NON-NLS-2$
+        }
+        // Design Decision -> resource (anything else): add State property
+        else if(sourceIsDesignDecision) {
+            relation.getProperties().add(IArchimateFactory.eINSTANCE.createProperty("State", "")); //$NON-NLS-1$ //$NON-NLS-2$
+        }
     }
     
     private EClass template;
@@ -146,6 +163,13 @@ public class ArchimateDiagramModelFactory implements ICreationFactory {
         // Archimate Diagram Object created from Archimate Element Template
         else if(object instanceof IArchimateElement element) {
             element.setName(profile != null ? profile.getName() : ArchiLabelProvider.INSTANCE.getDefaultName(template));
+            
+            // If this is a Design Decision, add the default Decision Type property
+            if(element.eClass().getName().equals("DesignDecision")) { //$NON-NLS-1$
+                IProperty property = IArchimateFactory.eINSTANCE.createProperty("Decision Type", ""); //$NON-NLS-1$ //$NON-NLS-2$
+                element.getProperties().add(property);
+            }
+            
             return createDiagramModelArchimateObject(element);
         }
         

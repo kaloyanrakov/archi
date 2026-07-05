@@ -7,17 +7,7 @@
     nsURI="http://www.archimatetool.com/archimate/designdecision"
     nsPrefix="designdecision">
 
-  <eClassifiers xsi:type="ecore:EEnum" name="DesignDecisionType">
-    <eLiterals name="Structural" value="0" literal="Structural"/>
-    <eLiterals name="Behavioral" value="1" literal="Behavioral"/>
-    <eLiterals name="Property" value="2" literal="Property"/>
-  </eClassifiers>
-
   <eClassifiers xsi:type="ecore:EClass" name="DesignDecision"
-      eSuperTypes="../../com.archimatetool.model/model/archimate.ecore#//MotivationElement">
-    <eStructuralFeatures xsi:type="ecore:EAttribute" name="decisionType"
-        eType="#//DesignDecisionType"
-        defaultValueLiteral="Structural"/>
-  </eClassifiers>
+      eSuperTypes="../../com.archimatetool.model/model/archimate.ecore#//MotivationElement"/>
 
 </ecore:EPackage>

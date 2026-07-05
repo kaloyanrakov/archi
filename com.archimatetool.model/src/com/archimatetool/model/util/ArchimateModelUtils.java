@@ -48,19 +48,22 @@ public class ArchimateModelUtils {
      * @param relationshipType The class of relationship to check
      * @return True if relationshipType is a valid source relationship for sourceComponent
      */
-    public static final boolean isValidRelationshipStart(IArchimateConcept sourceConcept, EClass relationshipType) {
-        // If the source concept is a Junction check for valid relationships
-        if(sourceConcept instanceof IJunction) {
-            // Has to be the same type of relationship
-            for(IArchimateRelationship rel : getAllRelationshipsForConcept(sourceConcept)) {
-                if(!rel.eClass().equals(relationshipType)) {
-                    return false;
-                }
-            }
-        }
-        
-        return RelationshipsMatrix.INSTANCE.isValidRelationshipStart(sourceConcept.eClass(), relationshipType);
-    }
+	public static final boolean isValidRelationshipStart(IArchimateConcept sourceConcept, EClass relationshipType) {
+	    // If the concept's EClass is not in the matrix, walk up its supertype hierarchy
+	    // to find the nearest registered type (e.g. DesignDecision -> MotivationElement)
+	    EClass sourceType = sourceConcept.eClass();
+	    
+	    if(!RelationshipsMatrix.INSTANCE.isValidRelationshipStart(sourceType, relationshipType)) {
+	        for(EClass superType : sourceType.getEAllSuperTypes()) {
+	            if(RelationshipsMatrix.INSTANCE.isValidRelationshipStart(superType, relationshipType)) {
+	                return true;
+	            }
+	        }
+	        return false;
+	    }
+	    
+	    return true;
+	}
     
     /**
      * Determine if a given relationship type is allowed between source and target Archimate components
@@ -116,16 +119,37 @@ public class ArchimateModelUtils {
      * @param relationshipType The relationship type to check
      * @return True if relationshipType is an allowed relationship type between sourceType and targetType
      */
-    public static final boolean isValidRelationship(EClass sourceType, EClass targetType, EClass relationshipType) {
-        return RelationshipsMatrix.INSTANCE.isValidRelationship(sourceType, targetType, relationshipType);
-    }
-    
     /**
-     * Get an array of all valid relationship class types between source and target Archimate components
-     * @param sourceConcept The source concept
-     * @param targetConcept The target concept
-     * @return An array of all valid relationship class types between sourceElement and targetElement
+     * Determine if a given relationship type is allowed between source and target Archimate class types
+     * @param sourceType The source type
+     * @param targetType The target type
+     * @param relationshipType The relationship type to check
+     * @return True if relationshipType is an allowed relationship type between sourceType and targetType
      */
+    public static final boolean isValidRelationship(EClass sourceType, EClass targetType, EClass relationshipType) {
+        // For plugin-contributed types not in the matrix, substitute the nearest registered supertype
+        EClass resolvedSource = resolveToRegisteredType(sourceType);
+        EClass resolvedTarget = resolveToRegisteredType(targetType);
+        return RelationshipsMatrix.INSTANCE.isValidRelationship(resolvedSource, resolvedTarget, relationshipType);
+    }
+
+    /**
+     * For a given EClass, return it if it exists in the relationships matrix,
+     * otherwise walk up its supertype hierarchy to find the nearest registered type.
+     * This allows plugin-contributed element types (e.g. DesignDecision) to inherit
+     * the connection rules of their nearest ArchiMate supertype (e.g. MotivationElement).
+     */
+    private static EClass resolveToRegisteredType(EClass eClass) {
+        if(RelationshipsMatrix.INSTANCE.getRelationshipsMatrix().containsKey(eClass)) {
+            return eClass;
+        }
+        for(EClass superType : eClass.getEAllSuperTypes()) {
+            if(RelationshipsMatrix.INSTANCE.getRelationshipsMatrix().containsKey(superType)) {
+                return superType;
+            }
+        }
+        return eClass;
+    }
     public static EClass[] getValidRelationships(IArchimateConcept sourceConcept, IArchimateConcept targetConcept) {
         List<EClass> list = new ArrayList<EClass>();
         
