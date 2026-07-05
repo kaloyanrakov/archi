@@ -34,6 +34,7 @@ import org.eclipse.swt.widgets.Label;
 import org.eclipse.swt.widgets.Shell;
 import org.eclipse.swt.widgets.Table;
 
+import com.archimatetool.editor.diagram.ArchimateDiagramModelFactory;
 import com.archimatetool.editor.ui.ArchiLabelProvider;
 import com.archimatetool.editor.ui.IArchiImages;
 import com.archimatetool.editor.ui.components.ExtendedTitleAreaDialog;
@@ -69,6 +70,10 @@ public class CreateDiagramArchimateConnectionWithDialogCommand extends CreateDia
         if(!fUseExistingRelation) {
             ((IDiagramModelArchimateConnection)fConnection).addArchimateConceptToModel(null);
         }
+
+        // Add ontology properties now that source/target are connected
+        IArchimateRelationship relation = ((IDiagramModelArchimateConnection)fConnection).getArchimateRelationship();
+        ArchimateDiagramModelFactory.addOntologyConnectionProperties(relation);
     }
 
     @Override

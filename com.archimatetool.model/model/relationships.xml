@@ -3901,6 +3901,48 @@
         <target concept="WorkPackage" relations="o" />
     </source>
 
+    <source concept="DesignDecision">
+    <!-- DesignDecision Realizes a Capability -->
+        <target concept="Capability" relations="nor" />
+    
+    <!-- DesignDecision Influences a Solution (WorkPackage = closest ArchiMate equivalent) -->
+        <target concept="WorkPackage" relations="no" />
+    
+    <!-- DesignDecision Influences another DesignDecision -->
+        <target concept="DesignDecision" relations="nos" />
+    
+    <!-- DesignDecision can associate with motivation elements -->
+        <target concept="Goal" relations="no" />
+        <target concept="Requirement" relations="no" />
+        <target concept="Constraint" relations="no" />
+        <target concept="Principle" relations="no" />
+        <target concept="Driver" relations="no" />
+        <target concept="Assessment" relations="no" />
+        <target concept="Outcome" relations="no" />
+        <target concept="Meaning" relations="no" />
+        <target concept="Value" relations="no" />
+        <target concept="Stakeholder" relations="no" />
+    
+    <!-- Standard elements reachable via association -->
+    <target concept="ApplicationComponent" relations="no" />
+    <target concept="ApplicationService" relations="no" />
+    <target concept="Node" relations="no" />
+    <target concept="SystemSoftware" relations="no" />
+    <target concept="TechnologyService" relations="no" />
+    <target concept="Artifact" relations="o" />
+    <target concept="DataObject" relations="o" />
+    <target concept="BusinessActor" relations="no" />
+    <target concept="BusinessRole" relations="no" />
+    <target concept="BusinessProcess" relations="no" />
+    <target concept="BusinessFunction" relations="no" />
+    <target concept="BusinessService" relations="no" />
+    
+    <!-- Always allow Grouping and Junction -->
+    <target concept="Grouping" relations="cgnos" />
+    <target concept="Junction" relations="acfginorstv" />
+    <target concept="Relationship" relations="o" />
+</source>
+
     <source concept="ValueStream">
         <target concept="ApplicationCollaboration" relations="o" />
         <target concept="ApplicationComponent" relations="o" />

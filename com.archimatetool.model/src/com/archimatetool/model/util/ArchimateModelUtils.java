@@ -49,10 +49,20 @@ public class ArchimateModelUtils {
      * @return True if relationshipType is a valid source relationship for sourceComponent
      */
 	public static final boolean isValidRelationshipStart(IArchimateConcept sourceConcept, EClass relationshipType) {
+	    // If the source concept is a Junction check for valid relationships
+	    if(sourceConcept instanceof IJunction) {
+	        // Has to be the same type of relationship
+	        for(IArchimateRelationship rel : getAllRelationshipsForConcept(sourceConcept)) {
+	            if(!rel.eClass().equals(relationshipType)) {
+	                return false;
+	            }
+	        }
+	    }
+
 	    // If the concept's EClass is not in the matrix, walk up its supertype hierarchy
 	    // to find the nearest registered type (e.g. DesignDecision -> MotivationElement)
 	    EClass sourceType = sourceConcept.eClass();
-	    
+
 	    if(!RelationshipsMatrix.INSTANCE.isValidRelationshipStart(sourceType, relationshipType)) {
 	        for(EClass superType : sourceType.getEAllSuperTypes()) {
 	            if(RelationshipsMatrix.INSTANCE.isValidRelationshipStart(superType, relationshipType)) {
@@ -61,7 +71,7 @@ public class ArchimateModelUtils {
 	        }
 	        return false;
 	    }
-	    
+
 	    return true;
 	}
     

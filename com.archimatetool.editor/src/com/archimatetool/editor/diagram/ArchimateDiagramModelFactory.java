@@ -90,7 +90,12 @@ public class ArchimateDiagramModelFactory implements ICreationFactory {
         return connection;
     }
     
-    private static void addOntologyConnectionProperties(IArchimateRelationship relation) {
+    public static void addOntologyConnectionProperties(IArchimateRelationship relation) {
+        // Source and target may not be set yet at factory creation time
+        if(relation.getSource() == null || relation.getTarget() == null) {
+            return;
+        }
+
         boolean sourceIsDesignDecision = relation.getSource().eClass().getName().equals("DesignDecision"); //$NON-NLS-1$
         boolean targetIsDesignDecision = relation.getTarget().eClass().getName().equals("DesignDecision"); //$NON-NLS-1$
 
